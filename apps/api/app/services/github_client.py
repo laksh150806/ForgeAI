@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from dataclasses import dataclass
-from urllib.parse import urlparse
+from urllib.parse import quote, urlparse
 
 import httpx
 from fastapi import HTTPException
@@ -97,7 +97,8 @@ class GitHubClient:
         return await self._get(f"/repos/{ref.full_name}")
 
     async def commit(self, ref: GitHubRepositoryRef, git_ref: str) -> dict:
-        return await self._get(f"/repos/{ref.full_name}/commits/{git_ref}")
+        safe_ref = quote(git_ref, safe="")
+        return await self._get(f"/repos/{ref.full_name}/commits/{safe_ref}")
 
     async def tree(self, ref: GitHubRepositoryRef, tree_sha: str) -> dict:
         return await self._get(
