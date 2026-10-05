@@ -77,3 +77,13 @@ text. Run-level metrics aggregate total latency, completed/failed stages, retrie
 evidence count, patch count, validation-command count, and the final PR-gate decision.
 This creates an auditable execution timeline without exposing internal chain-of-thought.
 Persistent storage and provider usage/cost metrics are future extensions of the same model.
+
+
+### Human-approved repository writes
+
+Repository mutation is a separate gated stage. ForgeAI requires an explicit approval
+boolean and then reruns sandbox validation server-side before any GitHub write. A passing
+client-side state is never trusted. If the fresh validation gate opens, ForgeAI creates a
+dedicated branch from the default branch, commits only materialized files from the
+validated patch, and opens a pull request with a generated validation report. Direct
+commits to the default branch are not used.
