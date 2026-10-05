@@ -58,6 +58,7 @@ class GitHubClient:
             "X-GitHub-Api-Version": "2022-11-28",
             "User-Agent": "ForgeAI",
         }
+        self._token = token
         if token:
             headers["Authorization"] = f"Bearer {token}"
 
@@ -114,13 +115,29 @@ class GitHubClient:
     ) -> str | None:
         safe_path = "/".join(quote(part, safe="") for part in path.split("/"))
         safe_ref = quote(git_ref, safe="")
-        response = await self._client.get(
-            f"/repos/{ref.full_name}/contents/{safe_path}",
-            params={"ref": safe_ref},
-            headers={"Accept": "application/vnd.github.raw+json"},
-        )
+
+        # Public repositories should not spend one GitHub REST request per source file.
+        # raw.githubusercontent.com avoids exhausting the unauthenticated REST quota.
+        if not self._token:
+            response = await self._client.get(
+                f"https://raw.githubusercontent.com/{ref.full_name}/{safe_ref}/{safe_path}"
+            )
+        else:
+            response = await self._client.get(
+                f"/repos/{ref.full_name}/contents/{safe_path}",
+                params={"ref": git_ref},
+                headers={"Accept": "application/vnd.github.raw+json"},
+            )
+
         if response.status_code == 404:
             return None
+        if response.status_code == 403:
+            remaining = response.headers.get("x-ratelimit-remaining")
+            if remaining == "0":
+                raise HTTPException(
+                    status_code=429,
+                    detail="GitHub API rate limit reached while fetching source files.",
+                )
         if response.is_error:
             raise HTTPException(
                 status_code=502,
