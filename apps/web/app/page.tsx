@@ -84,6 +84,16 @@ type Validation = {
   notes: string[];
 };
 
+type PullRequestResult = {
+  repository: string;
+  branch: string | null;
+  pull_request_url: string | null;
+  pull_request_number: number | null;
+  status: string;
+  committed_files: string[];
+  message: string;
+};
+
 type WorkflowRun = {
   run_id: string;
   repository: string;
@@ -138,8 +148,10 @@ export default function Home() {
   const [plan, setPlan] = useState<Plan | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
+  const [prResult, setPrResult] = useState<PullRequestResult | null>(null);
+  const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | "workflow" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | "workflow" | "pr" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -254,6 +266,45 @@ export default function Home() {
       setWorkflowRun(payload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Workflow run failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function createPullRequest() {
+    if (!plan || plan.patches.length === 0) {
+      setError("Generate a patch before creating a pull request.");
+      return;
+    }
+    if (!validation?.safe_to_propose_pr) {
+      setError("Run sandbox validation successfully before creating a pull request.");
+      return;
+    }
+    if (!prApproved) {
+      setError("Explicit approval is required before ForgeAI writes to GitHub.");
+      return;
+    }
+
+    setLoading("pr");
+    setError("");
+    setPrResult(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/pull-requests/create`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          task,
+          patches: plan.patches,
+          approved: true,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Pull request creation failed.");
+      setPrResult(payload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Pull request creation failed.");
     } finally {
       setLoading(null);
     }
@@ -531,6 +582,47 @@ export default function Home() {
               {validation.notes.map((note) => <li key={note}>{note}</li>)}
             </ul>
           </div>
+        </section>
+      )}
+
+      {validation?.safe_to_propose_pr && plan && plan.patches.length > 0 && (
+        <section className="panel prPanel">
+          <div className="analysisHeader">
+            <div>
+              <span className="label">HUMAN APPROVAL GATE</span>
+              <h2>Create validated GitHub pull request</h2>
+              <p>
+                ForgeAI will re-run server-side validation before any branch, commit, or PR is created.
+              </p>
+            </div>
+          </div>
+
+          <label className="approvalControl">
+            <input
+              type="checkbox"
+              checked={prApproved}
+              onChange={(event) => setPrApproved(event.target.checked)}
+            />
+            <span>
+              I approve ForgeAI creating a branch, committing the validated patch, and opening a pull request.
+            </span>
+          </label>
+
+          <button disabled={!prApproved || loading !== null} type="button" onClick={createPullRequest}>
+            {loading === "pr" ? "Creating pull request…" : "Create validated PR"}
+          </button>
+
+          {prResult && (
+            <div className="prResult">
+              <strong>{prResult.message}</strong>
+              {prResult.pull_request_url && (
+                <a href={prResult.pull_request_url} target="_blank" rel="noreferrer">
+                  Open PR #{prResult.pull_request_number}
+                </a>
+              )}
+              {prResult.branch && <code>{prResult.branch}</code>}
+            </div>
+          )}
         </section>
       )}
 
