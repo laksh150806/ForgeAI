@@ -30,8 +30,13 @@ will extend this into planning, patching, validation, and review while preservin
 state transitions and observable inputs/outputs.
 
 ### Validation sandbox
-Planned isolated environment for dependency installation, test execution, linting,
-type checks, security scans, and regression verification.
+Patch proposals are applied only to a temporary clone after `git apply --check` succeeds.
+ForgeAI derives validation commands from repository structure instead of accepting
+arbitrary browser-provided shell commands. Docker execution is network-isolated, drops all
+Linux capabilities, uses `no-new-privileges`, limits memory/CPU/PIDs, and uses a read-only
+container root filesystem. The disposable repository mount is the only writable project
+surface. If Docker is unavailable, ForgeAI performs only a non-executing Git diff check and
+keeps the PR gate closed.
 
 ## Design principles
 
