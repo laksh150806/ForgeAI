@@ -52,3 +52,13 @@ type checks, security scans, and regression verification.
 6. Patch proposal and diff preview.
 7. Validation execution.
 8. Final engineering report.
+
+
+### Planning and patch proposal
+
+The planning stage converts investigation evidence into ordered implementation steps,
+target files, risk notes, and validation commands. Patch generation is intentionally
+separate from planning: a model may propose a unified diff only for source files that
+ForgeAI fetched from the repository and supplied as context. Generated diffs are
+review-only artifacts and cannot mutate repositories in this phase. This preserves the
+human approval boundary before execution or GitHub writes.
