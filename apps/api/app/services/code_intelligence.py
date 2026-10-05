@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import ast
 import math
+import os
 import re
 from collections import Counter
 from dataclasses import dataclass
@@ -9,6 +10,7 @@ from pathlib import PurePosixPath
 
 from app.schemas.code_intelligence import CodeEvidence, CodeSearchResponse, CodeSymbol
 from app.services.embeddings import OpenAIEmbeddingProvider, cosine_similarity
+from app.services.git_repository import public_repository_checkout
 from app.services.github_client import GitHubClient, GitHubRepositoryRef, parse_github_repository_url
 from app.services.repository_intelligence import classify_path
 
@@ -188,7 +190,48 @@ def _snippet(text: str, query_terms: list[str], max_chars: int = 900) -> str:
     return snippet[:max_chars]
 
 
+async def _index_public_checkout(repository_url: str) -> RepositoryCodeIndex:
+    async with public_repository_checkout(repository_url) as (ref, root, _default_branch):
+        candidates: list[tuple[str, str | None, object]] = []
+
+        for item in root.rglob("*"):
+            if not item.is_file() or ".git" in item.parts:
+                continue
+
+            relative = item.relative_to(root).as_posix()
+            try:
+                size = item.stat().st_size
+            except OSError:
+                size = None
+
+            classified = classify_path(relative, size)
+            if classified.ignored or classified.kind != "source":
+                continue
+            if size is not None and size > 250_000:
+                continue
+            candidates.append((relative, classified.language, item))
+
+        candidates = candidates[:120]
+        chunks: list[CodeChunk] = []
+
+        for relative, language, item in candidates:
+            try:
+                source = item.read_text(encoding="utf-8", errors="replace")
+            except OSError:
+                continue
+            chunks.extend(chunk_source(relative, source, language))
+
+    return RepositoryCodeIndex(
+        repository=ref.full_name,
+        indexed_files=len(candidates),
+        chunks=chunks,
+    )
+
+
 async def index_repository_code(repository_url: str) -> RepositoryCodeIndex:
+    if not os.getenv("GITHUB_TOKEN"):
+        return await _index_public_checkout(repository_url)
+
     ref = parse_github_repository_url(repository_url)
     client = GitHubClient()
 
