@@ -1,0 +1,55 @@
+name: ForgeAI Live Smoke
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - ".github/workflows/live-smoke.yml"
+      - "apps/api/**"
+      - "apps/web/**"
+  workflow_dispatch:
+
+jobs:
+  live-smoke:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for Render API
+        shell: bash
+        run: |
+          set -euo pipefail
+          url="https://forgeai-api-ok42.onrender.com/health"
+          for attempt in $(seq 1 24); do
+            code=$(curl -sS -o /tmp/health.json -w "%{http_code}" "$url" || true)
+            if [ "$code" = "200" ]; then
+              cat /tmp/health.json
+              exit 0
+            fi
+            echo "Attempt $attempt: health returned $code"
+            sleep 10
+          done
+          echo "API health never reached 200"
+          exit 1
+
+      - name: Check readiness
+        run: |
+          curl --fail --show-error --silent             https://forgeai-api-ok42.onrender.com/ready | tee /tmp/ready.json
+
+      - name: Run live seed benchmark
+        run: |
+          curl --fail --show-error --silent             https://forgeai-api-ok42.onrender.com/api/v1/evaluation/seed             | tee /tmp/benchmark.json
+          python - <<'PY'
+          import json
+          with open('/tmp/benchmark.json') as f:
+              data=json.load(f)
+          m=data['metrics']
+          print(f"Top-1 accuracy: {m['top1_accuracy']:.4f}")
+          print(f"Top-3 recall: {m['topk_recall']:.4f}")
+          print(f"MRR: {m['mean_reciprocal_rank']:.4f}")
+          print(f"Symbol accuracy: {m['symbol_accuracy']}")
+          print(f"Average latency ms: {m['average_latency_ms']}")
+          assert m['cases'] >= 3
+          PY
+
+      - name: Check live web
+        run: |
+          curl --fail --show-error --silent             https://forgeai-web-irot.onrender.com             | grep -q "ForgeAI"
