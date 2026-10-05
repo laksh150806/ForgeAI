@@ -27,8 +27,9 @@ async def investigate_repository(
     repository_url: str,
     task: str,
     limit: int = 6,
+    search_result=None,
 ) -> InvestigationResponse:
-    search = await search_repository_code(
+    search = search_result or await search_repository_code(
         repository_url=repository_url,
         task=task,
         limit=limit,

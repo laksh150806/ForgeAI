@@ -67,3 +67,13 @@ separate from planning: a model may propose a unified diff only for source files
 ForgeAI fetched from the repository and supplied as context. Generated diffs are
 review-only artifacts and cannot mutate repositories in this phase. This preserves the
 human approval boundary before execution or GitHub writes.
+
+
+### Observability and execution traces
+
+ForgeAI exposes an orchestrated workflow run that records each major agent stage as a
+structured trace span. A span stores its name, status, duration, details, and bounded error
+text. Run-level metrics aggregate total latency, completed/failed stages, retrieval mode,
+evidence count, patch count, validation-command count, and the final PR-gate decision.
+This creates an auditable execution timeline without exposing internal chain-of-thought.
+Persistent storage and provider usage/cost metrics are future extensions of the same model.

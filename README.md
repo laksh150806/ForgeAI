@@ -99,7 +99,7 @@ Web: `http://localhost:3000`
 - [x] Structured engineering plan
 - [x] Patch/diff generation
 - [x] Sandboxed validation
-- [ ] Execution traces and metrics
+- [x] Execution traces and metrics
 - [ ] Human-approved GitHub PR creation
 - [ ] Evaluation benchmark suite
 
@@ -237,3 +237,26 @@ mount and temporary storage.
 
 The browser cannot submit arbitrary shell commands. If Docker is unavailable, ForgeAI
 performs only a non-executing `git diff --check` fallback and keeps the PR gate blocked.
+
+
+## End-to-end execution traces
+
+Run ForgeAI's core workflow with one request and receive a stage-by-stage trace:
+
+```http
+POST /api/v1/runs/execute
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/laksh150806/ForgeAI",
+  "task": "Fix repository URL validation for valid GitHub URLs.",
+  "generate_patch": true,
+  "validate_patch": true
+}
+```
+
+The trace records retrieval, investigation, planning/patch generation, and sandbox
+validation with per-stage duration, status, structured metadata, errors, total runtime,
+evidence count, patch count, validation-command count, retrieval mode, and final PR-gate
+state. The current trace is request-scoped; persistent trace storage and cost/token
+accounting can be layered onto the same run contract later.
