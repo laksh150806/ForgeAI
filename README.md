@@ -202,7 +202,7 @@ Content-Type: application/json
 ```
 
 Planning always works from investigation evidence. Patch generation is optional and uses
-`OPENAI_API_KEY` or `LLM_API_KEY` with `PATCH_MODEL` (default `gpt-5-mini`).
+`OPENAI_API_KEY` or `LLM_API_KEY` with `PATCH_MODEL` (default `gpt-6-luna`).
 ForgeAI only accepts patches for files that were actually loaded into model context.
 Every patch is preview-only and `approval_required` remains true; Phase 5 performs no
 repository writes.
