@@ -35,14 +35,22 @@ class CodeChunk:
 
 
 def normalize_tokens(text: str) -> list[str]:
-    tokens = [token.lower() for token in TOKEN_RE.findall(text)]
     expanded: list[str] = []
-    for token in tokens:
-        if token in STOPWORDS:
-            continue
-        expanded.append(token)
-        parts = re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", token).replace("_", " ").split()
-        expanded.extend(part.lower() for part in parts if len(part) > 1 and part.lower() not in STOPWORDS)
+    for raw_token in TOKEN_RE.findall(text):
+        token = raw_token.lower()
+        if token not in STOPWORDS:
+            expanded.append(token)
+
+        parts = (
+            re.sub(r"([a-z0-9])([A-Z])", r"\1 \2", raw_token)
+            .replace("_", " ")
+            .split()
+        )
+        expanded.extend(
+            part.lower()
+            for part in parts
+            if len(part) > 1 and part.lower() not in STOPWORDS
+        )
     return expanded
 
 
