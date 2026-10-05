@@ -35,6 +35,13 @@ class CodeChunk:
     tokens: list[str]
 
 
+@dataclass
+class RepositoryCodeIndex:
+    repository: str
+    indexed_files: int
+    chunks: list[CodeChunk]
+
+
 def normalize_tokens(text: str) -> list[str]:
     expanded: list[str] = []
     for raw_token in TOKEN_RE.findall(text):
@@ -181,7 +188,7 @@ def _snippet(text: str, query_terms: list[str], max_chars: int = 900) -> str:
     return snippet[:max_chars]
 
 
-async def search_repository_code(repository_url: str, task: str, limit: int = 8) -> CodeSearchResponse:
+async def index_repository_code(repository_url: str) -> RepositoryCodeIndex:
     ref = parse_github_repository_url(repository_url)
     client = GitHubClient()
 
@@ -203,7 +210,6 @@ async def search_repository_code(repository_url: str, task: str, limit: int = 8)
                 continue
             candidates.append(classified)
 
-        # MVP safety cap. Large-repo pagination/index persistence comes next.
         candidates = candidates[:120]
 
         chunks: list[CodeChunk] = []
@@ -215,6 +221,19 @@ async def search_repository_code(repository_url: str, task: str, limit: int = 8)
     finally:
         await client.close()
 
+    return RepositoryCodeIndex(
+        repository=ref.full_name,
+        indexed_files=len(candidates),
+        chunks=chunks,
+    )
+
+
+async def search_code_index(
+    index: RepositoryCodeIndex,
+    task: str,
+    limit: int = 8,
+) -> CodeSearchResponse:
+    chunks = index.chunks
     query_terms = normalize_tokens(task)
     idf = _idf(chunks, query_terms)
     ranked = []
@@ -234,10 +253,9 @@ async def search_repository_code(repository_url: str, task: str, limit: int = 8)
 
     retrieval_mode = "lexical"
     reranked = ranked
-
-    # Hybrid stage: semantically rerank the strongest lexical candidates.
     semantic_pool = ranked[: min(30, len(ranked))]
     provider = OpenAIEmbeddingProvider()
+
     if semantic_pool:
         texts = [task] + [
             f"{chunk.path}\n"
@@ -252,8 +270,8 @@ async def search_repository_code(repository_url: str, task: str, limit: int = 8)
             query_vector = vectors[0]
             max_lexical = max((item[0] for item in semantic_pool), default=1.0) or 1.0
             hybrid = []
-            for index, (lexical_score, chunk, reasons) in enumerate(semantic_pool, start=1):
-                semantic_score = max(0.0, cosine_similarity(query_vector, vectors[index]))
+            for vector_index, (lexical_score, chunk, reasons) in enumerate(semantic_pool, start=1):
+                semantic_score = max(0.0, cosine_similarity(query_vector, vectors[vector_index]))
                 lexical_norm = lexical_score / max_lexical
                 combined = (0.58 * lexical_norm) + (0.42 * semantic_score)
                 hybrid_reasons = reasons + [
@@ -277,10 +295,15 @@ async def search_repository_code(repository_url: str, task: str, limit: int = 8)
     ]
 
     return CodeSearchResponse(
-        repository=ref.full_name,
+        repository=index.repository,
         task=task,
         retrieval_mode=retrieval_mode,
-        indexed_files=len(candidates),
+        indexed_files=index.indexed_files,
         indexed_chunks=len(chunks),
         results=results,
     )
+
+
+async def search_repository_code(repository_url: str, task: str, limit: int = 8) -> CodeSearchResponse:
+    index = await index_repository_code(repository_url)
+    return await search_code_index(index, task, limit)
