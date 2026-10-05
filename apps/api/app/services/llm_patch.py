@@ -10,7 +10,7 @@ import httpx
 class PatchModel:
     def __init__(self) -> None:
         self.api_key = os.getenv("OPENAI_API_KEY") or os.getenv("LLM_API_KEY")
-        self.model = os.getenv("PATCH_MODEL", "gpt-5-mini")
+        self.model = os.getenv("PATCH_MODEL", "gpt-6-luna")
 
     async def propose(
         self,
