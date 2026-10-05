@@ -100,7 +100,7 @@ Web: `http://localhost:3000`
 - [x] Patch/diff generation
 - [x] Sandboxed validation
 - [x] Execution traces and metrics
-- [ ] Human-approved GitHub PR creation
+- [x] Human-approved GitHub PR creation
 - [ ] Evaluation benchmark suite
 
 ## Engineering principles
@@ -260,3 +260,29 @@ validation with per-stage duration, status, structured metadata, errors, total r
 evidence count, patch count, validation-command count, retrieval mode, and final PR-gate
 state. The current trace is request-scoped; persistent trace storage and cost/token
 accounting can be layered onto the same run contract later.
+
+
+## Human-approved GitHub PR creation
+
+ForgeAI can now close the loop after successful validation:
+
+```http
+POST /api/v1/pull-requests/create
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/owner/repository",
+  "task": "Fix the reported issue",
+  "patches": [...],
+  "approved": true
+}
+```
+
+This endpoint does **not** trust a browser-supplied validation flag. It reruns the full
+server-side sandbox validation and refuses to write if the PR gate is closed. It also
+requires explicit human approval. When both conditions pass, ForgeAI creates a new
+`forgeai/validated-...` branch, writes only the validated files, and opens a pull request
+whose body includes task context, changed files, sandbox result, validation checks, and
+the approval/validation safety statement.
+
+`GITHUB_TOKEN` must have write permission to the target repository.
