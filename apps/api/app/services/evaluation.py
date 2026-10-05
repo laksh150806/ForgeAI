@@ -8,7 +8,12 @@ from app.schemas.evaluation import (
     BenchmarkMetrics,
     BenchmarkResponse,
 )
-from app.services.code_intelligence import search_repository_code
+from app.services.code_intelligence import (
+    RepositoryCodeIndex,
+    index_repository_code,
+    search_code_index,
+    search_repository_code,
+)
 from app.services.observability import execute_workflow
 
 
@@ -80,13 +85,21 @@ async def evaluate_case(
     case: BenchmarkCase,
     top_k: int,
     run_full_pipeline: bool,
+    code_index: RepositoryCodeIndex | None = None,
 ) -> BenchmarkCaseResult:
     started = time.perf_counter()
-    search = await search_repository_code(
-        repository_url=str(case.repository_url),
-        task=case.task,
-        limit=max(top_k, 8),
-    )
+    if code_index is None:
+        search = await search_repository_code(
+            repository_url=str(case.repository_url),
+            task=case.task,
+            limit=max(top_k, 8),
+        )
+    else:
+        search = await search_code_index(
+            code_index,
+            task=case.task,
+            limit=max(top_k, 8),
+        )
     latency_ms = int((time.perf_counter() - started) * 1000)
 
     ranked_files: list[str] = []
@@ -143,12 +156,19 @@ async def run_benchmark(
     run_full_pipeline: bool = False,
 ) -> BenchmarkResponse:
     results: list[BenchmarkCaseResult] = []
+    indexes: dict[str, RepositoryCodeIndex] = {}
+
     for case in cases:
+        repository_url = str(case.repository_url).rstrip("/")
+        if repository_url not in indexes:
+            indexes[repository_url] = await index_repository_code(repository_url)
+
         results.append(
             await evaluate_case(
                 case=case,
                 top_k=top_k,
                 run_full_pipeline=run_full_pipeline,
+                code_index=indexes[repository_url],
             )
         )
 
