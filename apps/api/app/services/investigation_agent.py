@@ -10,11 +10,17 @@ from app.services.code_intelligence import search_repository_code
 def _confidence(scores: list[float]) -> float:
     if not scores:
         return 0.0
-    top = scores[0]
+
+    top = max(scores[0], 0.0)
     if len(scores) == 1:
-        return min(0.92, 0.45 + top / 25)
-    gap = max(0.0, top - scores[1])
-    return round(min(0.95, 0.42 + min(top / 35, 0.35) + min(gap / 20, 0.18)), 2)
+        strength = top / (top + 12.0)
+        return round(min(0.9, 0.45 + (0.4 * strength)), 2)
+
+    second = max(scores[1], 0.0)
+    strength = top / (top + 12.0)
+    separation = (top - second) / max(top, 1e-9)
+    value = 0.4 + (0.35 * strength) + (0.2 * max(0.0, separation))
+    return round(min(0.95, value), 2)
 
 
 async def investigate_repository(
