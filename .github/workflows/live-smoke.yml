@@ -32,16 +32,38 @@ jobs:
 
       - name: Check readiness
         run: |
-          curl --fail --show-error --silent             https://forgeai-api-ok42.onrender.com/ready | tee /tmp/ready.json
+          curl --fail --show-error --silent             https://forgeai-api-ok42.onrender.com/ready             | tee /tmp/ready.json
 
       - name: Run live seed benchmark
+        shell: bash
         run: |
-          curl --fail --show-error --silent             https://forgeai-api-ok42.onrender.com/api/v1/evaluation/seed             | tee /tmp/benchmark.json
+          set -euo pipefail
+          url="https://forgeai-api-ok42.onrender.com/api/v1/evaluation/seed"
+          success=0
+
+          for attempt in $(seq 1 24); do
+            code=$(curl -sS -o /tmp/benchmark.json -w "%{http_code}" "$url" || true)
+            if [ "$code" = "200" ]; then
+              success=1
+              break
+            fi
+            echo "Attempt $attempt: benchmark returned $code"
+            cat /tmp/benchmark.json || true
+            sleep 10
+          done
+
+          if [ "$success" != "1" ]; then
+            echo "Live benchmark never reached 200"
+            exit 1
+          fi
+
+          cat /tmp/benchmark.json
           python - <<'PY'
           import json
           with open('/tmp/benchmark.json') as f:
-              data=json.load(f)
-          m=data['metrics']
+              data = json.load(f)
+
+          m = data['metrics']
           print(f"Top-1 accuracy: {m['top1_accuracy']:.4f}")
           print(f"Top-3 recall: {m['topk_recall']:.4f}")
           print(f"MRR: {m['mean_reciprocal_rank']:.4f}")
