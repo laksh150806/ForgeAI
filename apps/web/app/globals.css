@@ -830,3 +830,320 @@ button {
 @media (max-width: 760px) {
   .traceHistoryList > button { align-items: flex-start; }
 }
+
+
+/* Responsive layout hardening: fluid from phones through large desktops. */
+html,
+body {
+  width: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+body {
+  -webkit-text-size-adjust: 100%;
+}
+
+.shell {
+  width: min(1120px, calc(100% - clamp(24px, 5vw, 48px)));
+  padding-block: clamp(32px, 7vw, 88px);
+}
+
+.hero {
+  width: 100%;
+  max-width: min(820px, 100%);
+  padding-block: clamp(24px, 5vw, 48px) clamp(44px, 8vw, 72px);
+}
+
+/* Allow every flex/grid descendant to actually shrink inside its container. */
+.shell *,
+.panel *,
+.hero * {
+  min-width: 0;
+}
+
+h1 {
+  font-size: clamp(2.25rem, 7vw, 6.2rem);
+  line-height: .96;
+  overflow-wrap: anywhere;
+}
+
+h2 {
+  font-size: clamp(1.35rem, 3.2vw, 2rem);
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+h3,
+p,
+li,
+strong,
+small,
+span,
+code,
+pre,
+a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.panel {
+  width: 100%;
+  max-width: 100%;
+  padding: clamp(16px, 3.5vw, 28px);
+  overflow: hidden;
+}
+
+.analysisHeader > div,
+.resultTop > div,
+.commandHeader > strong,
+.traceHistoryList > button > div {
+  min-width: 0;
+}
+
+.analysisHeader h2,
+.investigation h2,
+.planPanel h2 {
+  max-width: 100%;
+}
+
+.investigationGrid,
+.planGrid,
+.analysisGrid,
+.metrics,
+.traceMetrics,
+.benchmarkMetrics,
+.productProof,
+.stages {
+  width: 100%;
+}
+
+.resultTop strong,
+.patchHeader strong,
+.commandHeader strong,
+.fileList code,
+.commandList code,
+.benchmarkCases code,
+.traceDetails code,
+.branch,
+.prResult code {
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.resultCard pre,
+.patchCard pre,
+.validationCommands pre {
+  width: 100%;
+  max-width: 100%;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+  overflow-x: auto;
+}
+
+.repoForm,
+.taskForm {
+  width: 100%;
+  max-width: 780px;
+}
+
+.repoForm input,
+.taskForm textarea,
+button {
+  max-width: 100%;
+}
+
+.taskActions > button {
+  flex: 1 1 180px;
+}
+
+@media (max-width: 1024px) {
+  .shell {
+    width: min(100%, calc(100% - 32px));
+  }
+
+  .planGrid {
+    grid-template-columns: minmax(0, 1fr) minmax(240px, .75fr);
+    gap: 20px;
+  }
+
+  .productProof {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .stages {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .benchmarkMetrics,
+  .traceMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  .shell {
+    width: min(100%, calc(100% - 24px));
+    padding-top: 28px;
+  }
+
+  .hero {
+    padding-top: 20px;
+  }
+
+  .topBar {
+    margin-bottom: 30px;
+  }
+
+  .eyebrow,
+  .label {
+    letter-spacing: .11em;
+    font-size: .68rem;
+  }
+
+  h1 {
+    font-size: clamp(2.15rem, 11vw, 3.35rem);
+    letter-spacing: -.045em;
+  }
+
+  .lede {
+    font-size: 1rem;
+    line-height: 1.6;
+  }
+
+  .panel {
+    border-radius: 18px;
+  }
+
+  .analysisHeader,
+  .resultTop,
+  .patchHeader,
+  .commandHeader {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .analysisHeader {
+    gap: 12px;
+  }
+
+  .investigationGrid,
+  .planGrid,
+  .analysisGrid,
+  .metrics,
+  .productProof,
+  .stages {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .benchmarkMetrics,
+  .traceMetrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .repoForm {
+    flex-direction: column;
+  }
+
+  .repoForm button,
+  .taskActions > button,
+  .validateAction,
+  .prPanel > button {
+    width: 100%;
+  }
+
+  .taskActions {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .timelineStage {
+    grid-template-columns: 34px minmax(0, 1fr);
+    gap: 9px;
+  }
+
+  .timelineMarker {
+    width: 30px;
+    height: 30px;
+    font-size: .68rem;
+  }
+
+  .traceHistoryList > button {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .traceHistoryList > button > div:last-child {
+    text-align: left;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px 14px;
+  }
+
+  .capabilityStrip {
+    gap: 6px;
+  }
+
+  .capabilityStrip span {
+    font-size: .7rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .shell {
+    width: min(100%, calc(100% - 18px));
+  }
+
+  .topBar {
+    gap: 10px;
+  }
+
+  .brandMark {
+    width: 34px;
+    height: 34px;
+  }
+
+  .livePill {
+    padding: 6px 9px;
+    font-size: .68rem;
+    white-space: nowrap;
+  }
+
+  h1 {
+    font-size: clamp(2rem, 10.5vw, 2.8rem);
+  }
+
+  h2 {
+    font-size: clamp(1.25rem, 6.2vw, 1.65rem);
+  }
+
+  .panel {
+    padding: 14px;
+    border-radius: 16px;
+  }
+
+  .benchmarkMetrics,
+  .traceMetrics {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .resultCard,
+  .patchCard,
+  .validationCommands article,
+  .planSteps article,
+  .benchmarkCases article,
+  .timelineBody {
+    padding: 12px;
+  }
+
+  .symbols code,
+  .traceDetails code {
+    font-size: .68rem;
+  }
+
+  button {
+    padding: 12px 14px;
+  }
+}
