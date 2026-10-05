@@ -38,3 +38,5 @@ def test_memory_trace_store_round_trip(monkeypatch) -> None:
     assert rows[0]["run_id"] == "trace-test-1"
     payload = asyncio.run(trace_store.get_run("trace-test-1"))
     assert payload["task"] == "Find the failing path"
+    assert payload["status"] == "completed"
+    assert payload["metrics"]["total_duration_ms"] == 123
