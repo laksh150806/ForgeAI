@@ -562,3 +562,47 @@ button {
 @media (max-width: 760px) {
   .traceMetrics { grid-template-columns: 1fr 1fr; }
 }
+
+
+.prPanel {
+  margin-bottom: 24px;
+  border-color: #3d536d;
+}
+
+.approvalControl {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  padding: 16px;
+  border: 1px solid #2a3b50;
+  border-radius: 14px;
+  background: #0b131e;
+  margin: 18px 0;
+  color: #b7c6d8;
+  line-height: 1.5;
+}
+
+.approvalControl input {
+  margin-top: 3px;
+  width: 18px;
+  height: 18px;
+}
+
+.prResult {
+  display: grid;
+  gap: 8px;
+  margin-top: 16px;
+  padding: 14px;
+  border: 1px solid #28543f;
+  border-radius: 12px;
+  background: #0b1a14;
+}
+
+.prResult a {
+  color: #8fd5ff;
+  font-weight: 700;
+}
+
+.prResult code {
+  color: #c9def0;
+}
