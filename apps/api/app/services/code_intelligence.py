@@ -27,6 +27,29 @@ STOPWORDS = {
     "should","could","would","have","has","had","are","was","were","its","our","your",
 }
 
+QUERY_ALIASES = {
+    "isolated": {"sandbox", "sandboxed"},
+    "isolation": {"sandbox", "sandboxed"},
+    "validation": {"validate", "validated", "validator"},
+    "validating": {"validate", "validation"},
+    "approval": {"approve", "approved"},
+    "approved": {"approval", "approve"},
+    "repository": {"repo"},
+    "repositories": {"repo"},
+    "patches": {"patch"},
+    "patched": {"patch"},
+    "applies": {"apply"},
+    "applying": {"apply"},
+    "opening": {"open", "create"},
+    "creates": {"create"},
+    "creating": {"create"},
+}
+
+PHRASE_ALIASES = {
+    "pull request": {"pr"},
+    "pull requests": {"pr"},
+}
+
 
 @dataclass
 class CodeChunk:
@@ -62,6 +85,21 @@ def normalize_tokens(text: str) -> list[str]:
             if len(part) > 1 and part.lower() not in STOPWORDS
         )
     return expanded
+
+
+def query_tokens(text: str) -> list[str]:
+    base = normalize_tokens(text)
+    expanded = list(base)
+    lowered = text.lower()
+
+    for phrase, aliases in PHRASE_ALIASES.items():
+        if phrase in lowered:
+            expanded.extend(sorted(aliases))
+
+    for token in base:
+        expanded.extend(sorted(QUERY_ALIASES.get(token, set())))
+
+    return list(dict.fromkeys(expanded))
 
 
 def extract_python_symbols(source: str) -> list[CodeSymbol]:
@@ -144,28 +182,41 @@ def score_chunk(chunk: CodeChunk, query_terms: list[str], idf: dict[str, float])
     matched: list[str] = []
 
     path_tokens = set(normalize_tokens(chunk.path))
-    symbol_tokens = {token for symbol in chunk.symbols for token in normalize_tokens(symbol.name)}
+    symbol_tokens = {
+        token
+        for symbol in chunk.symbols
+        for token in normalize_tokens(symbol.name)
+    }
 
     for term in query_terms:
         frequency = counts.get(term, 0)
-        if not frequency:
-            continue
-
         weight = idf.get(term, 1.0)
-        tf = 1 + math.log(frequency)
-        contribution = tf * weight
 
+        if frequency:
+            score += (1 + math.log(frequency)) * weight
+            matched.append(term)
+
+        # Repository-localization tasks benefit more from structural evidence than
+        # repeated prose/UI mentions. Path and symbol matches therefore add strong,
+        # bounded bonuses rather than merely multiplying content frequency.
         if term in path_tokens:
-            contribution *= 1.8
+            score += 4.0 * weight
+            matched.append(term)
         if term in symbol_tokens:
-            contribution *= 2.2
+            score += 3.25 * weight
+            matched.append(term)
 
-        score += contribution
-        matched.append(term)
-
-    if chunk.path.lower().endswith(("test.py", ".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx")):
-        if any(term in {"test", "regression", "failure"} for term in query_terms):
-            score *= 1.25
+    lowered_path = chunk.path.lower()
+    is_test = (
+        "/tests/" in f"/{lowered_path}"
+        or lowered_path.startswith("tests/")
+        or lowered_path.endswith(("test.py", ".test.ts", ".test.tsx", ".spec.ts", ".spec.tsx"))
+    )
+    if is_test:
+        if any(term in {"test", "tests", "regression", "failure"} for term in query_terms):
+            score *= 1.2
+        else:
+            score *= 0.82
 
     return score, sorted(set(matched))
 
@@ -277,7 +328,7 @@ async def search_code_index(
     limit: int = 8,
 ) -> CodeSearchResponse:
     chunks = index.chunks
-    query_terms = normalize_tokens(task)
+    query_terms = query_tokens(task)
     idf = _idf(chunks, query_terms)
     ranked = []
 
