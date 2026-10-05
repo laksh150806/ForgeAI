@@ -5,11 +5,12 @@ from app.routes.code_intelligence import router as code_intelligence_router
 from app.routes.investigations import router as investigations_router
 from app.routes.planning import router as planning_router
 from app.routes.repositories import router as repositories_router
+from app.routes.runs import router as runs_router
 from app.routes.validation import router as validation_router
 
 app = FastAPI(
     title="ForgeAI API",
-    version="0.6.0",
+    version="0.7.0",
     description="Autonomous software engineering and incident intelligence platform.",
 )
 
@@ -26,6 +27,7 @@ app.include_router(code_intelligence_router)
 app.include_router(investigations_router)
 app.include_router(planning_router)
 app.include_router(validation_router)
+app.include_router(runs_router)
 
 
 @app.get("/health")
@@ -37,6 +39,6 @@ def health() -> dict[str, str]:
 def status() -> dict[str, str]:
     return {
         "product": "ForgeAI",
-        "phase": "sandbox-validation",
-        "capability": "isolated patch application and validation",
+        "phase": "observability-traces",
+        "capability": "end-to-end execution traces and run metrics",
     }
