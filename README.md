@@ -98,7 +98,7 @@ Web: `http://localhost:3000`
 - [x] Structured investigation agent
 - [x] Structured engineering plan
 - [x] Patch/diff generation
-- [ ] Sandboxed validation
+- [x] Sandboxed validation
 - [ ] Execution traces and metrics
 - [ ] Human-approved GitHub PR creation
 - [ ] Evaluation benchmark suite
@@ -206,3 +206,34 @@ Planning always works from investigation evidence. Patch generation is optional 
 ForgeAI only accepts patches for files that were actually loaded into model context.
 Every patch is preview-only and `approval_required` remains true; Phase 5 performs no
 repository writes.
+
+
+## Sandboxed patch validation
+
+Validate generated patch proposals before any GitHub write is permitted:
+
+```http
+POST /api/v1/validation/run
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/laksh150806/ForgeAI",
+  "patches": [
+    {
+      "path": "apps/api/app/main.py",
+      "rationale": "example",
+      "unified_diff": "--- a/...\n+++ b/...\n@@ ..."
+    }
+  ]
+}
+```
+
+ForgeAI clones the repository into a temporary workspace, verifies the unified diff with
+`git apply --check`, applies it only to that disposable clone, and then runs fixed
+validation commands. When Docker is available, validation executes with network disabled,
+all Linux capabilities dropped, a PID/CPU/memory limit, `no-new-privileges`, and a
+read-only container filesystem. The container may write only to the disposable repository
+mount and temporary storage.
+
+The browser cannot submit arbitrary shell commands. If Docker is unavailable, ForgeAI
+performs only a non-executing `git diff --check` fallback and keeps the PR gate blocked.
