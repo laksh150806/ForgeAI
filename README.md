@@ -127,7 +127,7 @@ The project is designed to demonstrate practical skills across:
 
 **AI engineering · agents · RAG · code intelligence · backend · frontend · databases · GitHub automation · testing · security · DevOps · observability · evaluation**
 
-See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the current architecture.
+See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the current architecture and [docs/FREE_STACK.md](docs/FREE_STACK.md) for the zero-cost deployment plan.
 
 
 ## Repository Intelligence API
