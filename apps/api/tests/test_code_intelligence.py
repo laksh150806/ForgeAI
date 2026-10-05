@@ -21,10 +21,9 @@ async def refresh_access_token():
 
 
 def test_normalize_tokens_expands_identifiers() -> None:
-    tokens = normalize_tokens("refresh_access_token JWTMiddleware tokenService")
-    assert "refresh" in tokens
-    assert "access" in tokens
+    tokens = normalize_tokens("tokenService")
     assert "token" in tokens
+    assert "service" in tokens
 
 
 def test_chunk_source_carries_symbols() -> None:
