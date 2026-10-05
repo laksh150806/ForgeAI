@@ -85,7 +85,7 @@ async def execute_workflow(
         investigation = await _trace_stage(
             stages,
             "investigation",
-            lambda: investigate_repository(repository_url, task, limit=6),
+            lambda: investigate_repository(repository_url, task, limit=6, search_result=search),
             lambda result: {
                 "confidence": result.hypothesis.confidence,
                 "evidence_count": len(result.evidence),
@@ -96,7 +96,12 @@ async def execute_workflow(
         plan = await _trace_stage(
             stages,
             "planning_and_patch",
-            lambda: create_engineering_plan(repository_url, task, generate_patch),
+            lambda: create_engineering_plan(
+                repository_url,
+                task,
+                generate_patch,
+                investigation_result=investigation,
+            ),
             lambda result: {
                 "confidence": result.plan.confidence,
                 "target_files": len(result.plan.target_files),
