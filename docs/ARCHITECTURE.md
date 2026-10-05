@@ -87,3 +87,13 @@ client-side state is never trusted. If the fresh validation gate opens, ForgeAI 
 dedicated branch from the default branch, commits only materialized files from the
 validated patch, and opens a pull request with a generated validation report. Direct
 commits to the default branch are not used.
+
+
+### Evaluation
+
+The evaluation layer consumes gold-labeled benchmark cases containing a repository task
+and expected implementation files/symbols. It measures Top-1 localization accuracy,
+Recall@K, Mean Reciprocal Rank, symbol accuracy, and retrieval latency. Optional full
+workflow evaluation additionally records whether patches are generated, sandbox
+validation passes, and the PR gate matches an expected outcome. Benchmark scoring logic
+is deterministic and unit-tested independently of model credentials.
