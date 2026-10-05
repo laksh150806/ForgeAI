@@ -92,9 +92,9 @@ Web: `http://localhost:3000`
 - [x] Web + API skeleton
 - [x] GitHub repository ingestion
 - [x] Repository file inventory
-- [ ] AST-aware code parsing
-- [ ] Semantic + lexical retrieval
-- [ ] Task-to-file investigation agent
+- [x] AST-aware code parsing
+- [x] Lexical retrieval + symbol-aware ranking
+- [x] Task-to-file retrieval layer
 - [ ] Structured engineering plan
 - [ ] Patch/diff generation
 - [ ] Sandboxed validation
@@ -137,3 +137,23 @@ Content-Type: application/json
 The response includes repository metadata, file inventory, source-language distribution,
 important project files, and files excluded as generated/dependency noise. Set
 `GITHUB_TOKEN` for higher GitHub API limits and future private-repository support.
+
+
+## Code Intelligence API
+
+Rank repository code against an engineering task:
+
+```http
+POST /api/v1/code/search
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/laksh150806/ForgeAI",
+  "task": "Find the code responsible for GitHub repository URL validation.",
+  "limit": 8
+}
+```
+
+ForgeAI extracts source symbols, chunks code, normalizes identifier tokens, and ranks
+evidence using task-term relevance with path and symbol boosts. Semantic embeddings and
+persistent indexing are planned as the next retrieval upgrade.
