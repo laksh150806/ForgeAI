@@ -781,3 +781,52 @@ button {
   .brandLockup span:not(.brandMark) { display:none; }
   .productProof { grid-template-columns:1fr; }
 }
+
+
+.traceHistoryPanel {
+  margin-bottom: 24px;
+  border-color: #2d445c;
+}
+
+.traceHistoryList {
+  display: grid;
+  gap: 10px;
+  margin-top: 18px;
+}
+
+.traceHistoryList > button {
+  width: 100%;
+  border: 1px solid #1f3146;
+  background: #09111b;
+  color: #d7e3ef;
+  border-radius: 13px;
+  padding: 13px 15px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.traceHistoryList > button:hover {
+  border-color: #3b617f;
+  background: #0c1622;
+}
+
+.traceHistoryList > button > div {
+  display: grid;
+  gap: 4px;
+}
+
+.traceHistoryList span {
+  color: #8295ac;
+  font-size: .76rem;
+}
+
+.traceHistoryList > button > div:last-child {
+  text-align: right;
+}
+
+@media (max-width: 760px) {
+  .traceHistoryList > button { align-items: flex-start; }
+}
