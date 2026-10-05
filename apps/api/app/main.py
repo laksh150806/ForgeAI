@@ -1,4 +1,6 @@
-from fastapi import FastAPI
+import os
+
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.code_intelligence import router as code_intelligence_router
@@ -9,16 +11,23 @@ from app.routes.pull_requests import router as pull_requests_router
 from app.routes.repositories import router as repositories_router
 from app.routes.runs import router as runs_router
 from app.routes.validation import router as validation_router
+from app.services.trace_store import database_ready
 
 app = FastAPI(
     title="ForgeAI API",
-    version="0.7.0",
+    version="0.10.0",
     description="Autonomous software engineering and incident intelligence platform.",
 )
 
+cors_origins = [
+    item.strip()
+    for item in os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
+    if item.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -39,10 +48,20 @@ def health() -> dict[str, str]:
     return {"status": "ok", "service": "forgeai-api"}
 
 
+@app.get("/ready")
+async def ready() -> dict[str, str]:
+    if not await database_ready():
+        raise HTTPException(
+            status_code=503,
+            detail="ForgeAI API is running but its configured database is unavailable.",
+        )
+    return {"status": "ready", "service": "forgeai-api"}
+
+
 @app.get("/api/v1/status")
 def status() -> dict[str, str]:
     return {
         "product": "ForgeAI",
-        "phase": "evaluation-benchmarks",
-        "capability": "gold-labeled retrieval and end-to-end agent evaluation",
+        "phase": "production-hardening",
+        "capability": "deployable web/API stack with persistent execution traces",
     }
