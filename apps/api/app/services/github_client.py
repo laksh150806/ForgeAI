@@ -105,3 +105,25 @@ class GitHubClient:
             f"/repos/{ref.full_name}/git/trees/{tree_sha}",
             recursive=1,
         )
+
+    async def file_content(
+        self,
+        ref: GitHubRepositoryRef,
+        path: str,
+        git_ref: str,
+    ) -> str | None:
+        safe_path = "/".join(quote(part, safe="") for part in path.split("/"))
+        safe_ref = quote(git_ref, safe="")
+        response = await self._client.get(
+            f"/repos/{ref.full_name}/contents/{safe_path}",
+            params={"ref": safe_ref},
+            headers={"Accept": "application/vnd.github.raw+json"},
+        )
+        if response.status_code == 404:
+            return None
+        if response.is_error:
+            raise HTTPException(
+                status_code=502,
+                detail=f"GitHub file fetch returned {response.status_code}.",
+            )
+        return response.text
