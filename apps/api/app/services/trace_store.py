@@ -16,7 +16,17 @@ _memory_runs: deque[dict] = deque(maxlen=_MEMORY_LIMIT)
 
 
 def database_url() -> str | None:
-    return os.getenv("DATABASE_URL") or None
+    value = os.getenv("DATABASE_URL") or None
+    if not value:
+        return None
+
+    # Supabase connections should always use TLS. The shared session pooler is the
+    # recommended free-tier option when the application host needs IPv4 connectivity.
+    if "supabase.com" in value and "sslmode=" not in value:
+        separator = "&" if "?" in value else "?"
+        value = f"{value}{separator}sslmode=require"
+
+    return value
 
 
 async def _ensure_schema(connection: psycopg.AsyncConnection) -> None:
