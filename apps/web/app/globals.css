@@ -200,3 +200,65 @@ button {
   .analysisHeader { flex-direction: column; }
   .metrics, .analysisGrid { grid-template-columns: 1fr; }
 }
+
+
+.taskForm {
+  display: grid;
+  gap: 12px;
+  max-width: 780px;
+  margin-top: 14px;
+}
+
+.taskForm textarea {
+  min-height: 110px;
+  resize: vertical;
+  border: 1px solid #26364b;
+  background: rgba(10, 17, 28, .88);
+  color: #e5edf7;
+  border-radius: 12px;
+  padding: 14px 16px;
+  font: inherit;
+}
+
+.retrieval { margin-bottom: 24px; }
+.resultList { display: grid; gap: 14px; margin-top: 24px; }
+.resultCard {
+  border: 1px solid #1b2a3d;
+  border-radius: 16px;
+  background: #0b121d;
+  padding: 18px;
+}
+.resultTop {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+.rank { color: #64748b; margin-right: 10px; font-family: ui-monospace, monospace; }
+.score {
+  color: #7dd3fc;
+  font-family: ui-monospace, monospace;
+  border: 1px solid #23425a;
+  border-radius: 999px;
+  padding: 5px 9px;
+}
+.symbols { display: flex; flex-wrap: wrap; gap: 7px; margin: 14px 0; }
+.symbols code {
+  background: #101b2a;
+  color: #c4e8ff;
+  border-radius: 8px;
+  padding: 6px 8px;
+  font-size: .76rem;
+}
+.reason { color: #8fa0b8; font-size: .88rem; }
+.resultCard pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  background: #070c13;
+  border: 1px solid #162235;
+  border-radius: 12px;
+  padding: 14px;
+  color: #cbd5e1;
+  font-size: .78rem;
+  line-height: 1.55;
+}
