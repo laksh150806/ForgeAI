@@ -27,3 +27,12 @@ def test_validation_commands_cover_python() -> None:
 def test_validation_commands_cover_web() -> None:
     commands = _validation_commands(["src/auth.ts"])
     assert "npm run build --if-present" in commands
+
+
+def test_planning_public_context_loader_is_quota_free() -> None:
+    import inspect
+    from app.services import planning_agent
+
+    source = inspect.getsource(planning_agent._load_patch_context)
+    assert "public_repository_checkout" in source
+    assert "if not os.getenv(\"GITHUB_TOKEN\")" in source
