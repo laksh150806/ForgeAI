@@ -2,11 +2,17 @@ from __future__ import annotations
 
 import json
 import os
+from collections import deque
+from datetime import datetime, timezone
 
 import psycopg
 from psycopg.rows import dict_row
 
 from app.schemas.observability import WorkflowRunResponse
+
+
+_MEMORY_LIMIT = 50
+_memory_runs: deque[dict] = deque(maxlen=_MEMORY_LIMIT)
 
 
 def database_url() -> str | None:
@@ -35,10 +41,26 @@ async def _ensure_schema(connection: psycopg.AsyncConnection) -> None:
     )
 
 
-async def save_run(run: WorkflowRunResponse) -> bool:
+def _remember(run: WorkflowRunResponse) -> None:
+    _memory_runs.appendleft(
+        {
+            "run_id": run.run_id,
+            "created_at": datetime.now(timezone.utc),
+            "repository": run.repository,
+            "task": run.task,
+            "status": run.status,
+            "total_duration_ms": run.metrics.total_duration_ms,
+            "payload": run.model_dump(mode="json"),
+        }
+    )
+
+
+async def save_run(run: WorkflowRunResponse) -> str:
+    _remember(run)
+
     url = database_url()
     if not url:
-        return False
+        return "memory"
 
     async with await psycopg.AsyncConnection.connect(url, autocommit=True) as connection:
         await _ensure_schema(connection)
@@ -64,13 +86,16 @@ async def save_run(run: WorkflowRunResponse) -> bool:
                 json.dumps(run.model_dump(mode="json")),
             ),
         )
-    return True
+    return "postgres"
 
 
 async def recent_runs(limit: int = 20) -> list[dict]:
     url = database_url()
     if not url:
-        return []
+        return [
+            {key: value for key, value in item.items() if key != "payload"}
+            for item in list(_memory_runs)[:limit]
+        ]
 
     async with await psycopg.AsyncConnection.connect(
         url,
@@ -88,6 +113,29 @@ async def recent_runs(limit: int = 20) -> list[dict]:
             (limit,),
         )
         return [dict(row) for row in await cursor.fetchall()]
+
+
+async def get_run(run_id: str) -> dict | None:
+    for item in _memory_runs:
+        if item["run_id"] == run_id:
+            return item["payload"]
+
+    url = database_url()
+    if not url:
+        return None
+
+    async with await psycopg.AsyncConnection.connect(
+        url,
+        autocommit=True,
+        row_factory=dict_row,
+    ) as connection:
+        await _ensure_schema(connection)
+        cursor = await connection.execute(
+            "SELECT payload FROM forgeai_runs WHERE run_id = %s",
+            (run_id,),
+        )
+        row = await cursor.fetchone()
+        return dict(row)["payload"] if row else None
 
 
 async def database_ready() -> bool:

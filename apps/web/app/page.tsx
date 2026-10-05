@@ -1,6 +1,6 @@
 "use client";
 
-import { FormEvent, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 type LanguageStat = { language: string; files: number; share: number };
 type Analysis = {
@@ -143,6 +143,15 @@ type WorkflowRun = {
   };
 };
 
+type RecentRun = {
+  run_id: string;
+  created_at: string;
+  repository: string;
+  task: string;
+  status: string;
+  total_duration_ms: number;
+};
+
 type Investigation = {
   repository: string;
   task: string;
@@ -175,11 +184,39 @@ export default function Home() {
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
   const [prResult, setPrResult] = useState<PullRequestResult | null>(null);
   const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
+  const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
+
+  async function loadRecentRuns() {
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/runs/recent?limit=8`);
+      if (!response.ok) return;
+      setRecentRuns(await response.json());
+    } catch {
+      // Observability history is supplemental; do not break the core UI if it is unavailable.
+    }
+  }
+
+  async function loadTrace(runId: string) {
+    setError("");
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/runs/${runId}`);
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Trace could not be loaded.");
+      setWorkflowRun(payload);
+      await loadRecentRuns();
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Trace could not be loaded.");
+    }
+  }
+
+  useEffect(() => {
+    loadRecentRuns();
+  }, []);
 
   async function analyzeRepository(event: FormEvent) {
     event.preventDefault();
@@ -290,6 +327,7 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? "Workflow run failed.");
       setWorkflowRun(payload);
+      await loadRecentRuns();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Workflow run failed.");
     } finally {
@@ -515,6 +553,34 @@ export default function Home() {
                 </p>
                 <code>{item.ranked_files[0] ?? "No result"}</code>
               </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      {recentRuns.length > 0 && (
+        <section className="panel traceHistoryPanel">
+          <div className="analysisHeader">
+            <div>
+              <span className="label">TRACE HISTORY</span>
+              <h2>Recent agent runs</h2>
+              <p>Latest workflow executions retained by the live API.</p>
+            </div>
+            <button className="secondaryButton" type="button" onClick={loadRecentRuns}>Refresh</button>
+          </div>
+
+          <div className="traceHistoryList">
+            {recentRuns.map((run) => (
+              <button key={run.run_id} type="button" onClick={() => loadTrace(run.run_id)}>
+                <div>
+                  <strong>#{run.run_id}</strong>
+                  <span>{run.repository}</span>
+                </div>
+                <div>
+                  <span>{run.status}</span>
+                  <span>{run.total_duration_ms}ms</span>
+                </div>
+              </button>
             ))}
           </div>
         </section>
