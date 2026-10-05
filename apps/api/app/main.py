@@ -4,6 +4,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.code_intelligence import router as code_intelligence_router
 from app.routes.investigations import router as investigations_router
 from app.routes.planning import router as planning_router
+from app.routes.pull_requests import router as pull_requests_router
 from app.routes.repositories import router as repositories_router
 from app.routes.runs import router as runs_router
 from app.routes.validation import router as validation_router
@@ -26,6 +27,7 @@ app.include_router(repositories_router)
 app.include_router(code_intelligence_router)
 app.include_router(investigations_router)
 app.include_router(planning_router)
+app.include_router(pull_requests_router)
 app.include_router(validation_router)
 app.include_router(runs_router)
 
@@ -39,6 +41,6 @@ def health() -> dict[str, str]:
 def status() -> dict[str, str]:
     return {
         "product": "ForgeAI",
-        "phase": "observability-traces",
-        "capability": "end-to-end execution traces and run metrics",
+        "phase": "human-approved-pr",
+        "capability": "validated, explicitly approved GitHub pull-request creation",
     }
