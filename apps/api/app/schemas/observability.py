@@ -15,7 +15,7 @@ class TraceStage(BaseModel):
     name: str
     status: str
     duration_ms: int
-    details: dict[str, str | int | float | bool | None] = {}
+    details: dict[str, str | int | float | bool | None] = Field(default_factory=dict)
     error: str | None = None
 
 
