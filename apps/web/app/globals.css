@@ -262,3 +262,38 @@ button {
   font-size: .78rem;
   line-height: 1.55;
 }
+
+
+.taskActions {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.secondaryButton {
+  background: #0f1a28;
+  color: #c8dcf2;
+  border-color: #2a3c54;
+}
+
+.investigation {
+  margin-bottom: 24px;
+  border-color: #28435c;
+}
+
+.investigationGrid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+  margin-top: 18px;
+}
+
+.investigationGrid li {
+  color: #aab7c9;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 760px) {
+  .investigationGrid { grid-template-columns: 1fr; }
+}
