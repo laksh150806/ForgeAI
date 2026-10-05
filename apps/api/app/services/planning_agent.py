@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import os
 from app.schemas.planning import (
     EngineeringPlan,
     PatchFile,
     PlanResponse,
     PlanStep,
 )
+from app.services.git_repository import public_repository_checkout
 from app.services.github_client import GitHubClient, parse_github_repository_url
 from app.services.investigation_agent import investigate_repository
 from app.services.llm_patch import PatchModel
@@ -94,6 +96,21 @@ async def _load_patch_context(
     repository_url: str,
     paths: list[str],
 ) -> list[dict[str, str]]:
+    # Public/demo repositories should not depend on GitHub's anonymous REST quota.
+    # Reuse the shallow-clone path used by repository/code intelligence.
+    if not os.getenv("GITHUB_TOKEN"):
+        result: list[dict[str, str]] = []
+        async with public_repository_checkout(repository_url) as (_ref, root, _branch):
+            for path in paths[:3]:
+                file_path = root / path
+                try:
+                    if file_path.is_file():
+                        content = file_path.read_text(encoding="utf-8", errors="replace")
+                        result.append({"path": path, "content": content[:18000]})
+                except OSError:
+                    continue
+        return result
+
     ref = parse_github_repository_url(repository_url)
     client = GitHubClient()
     try:
