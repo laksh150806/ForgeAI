@@ -606,3 +606,59 @@ button {
 .prResult code {
   color: #c9def0;
 }
+
+
+.benchmarkPanel {
+  margin-bottom: 24px;
+  border-color: #3d4d6f;
+}
+
+.benchmarkMetrics {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 22px 0;
+}
+
+.benchmarkMetrics article {
+  border: 1px solid #202f45;
+  background: #0a121d;
+  border-radius: 14px;
+  padding: 15px;
+}
+
+.benchmarkMetrics span {
+  display: block;
+  color: #8192a8;
+  font-size: .75rem;
+  margin-bottom: 8px;
+}
+
+.benchmarkMetrics strong {
+  font-size: 1.35rem;
+}
+
+.benchmarkCases {
+  display: grid;
+  gap: 12px;
+}
+
+.benchmarkCases article {
+  border: 1px solid #1e2d42;
+  border-radius: 14px;
+  background: #09111b;
+  padding: 14px;
+}
+
+.benchmarkCases p {
+  color: #93a5bb;
+  margin-bottom: 8px;
+}
+
+.benchmarkCases code {
+  color: #bfe4fb;
+}
+
+@media (max-width: 760px) {
+  .benchmarkMetrics { grid-template-columns: 1fr 1fr; }
+}

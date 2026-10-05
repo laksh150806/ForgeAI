@@ -1,0 +1,39 @@
+{
+  "name": "ForgeAI self-evaluation seed set",
+  "description": "Gold-labeled repository tasks used to measure retrieval quality. Expand this file as ForgeAI grows.",
+  "cases": [
+    {
+      "id": "github-url-validation",
+      "repository_url": "https://github.com/laksh150806/ForgeAI",
+      "task": "Find the implementation responsible for validating GitHub repository URLs.",
+      "expected_files": [
+        "apps/api/app/services/github_client.py"
+      ],
+      "expected_symbols": [
+        "parse_github_repository_url"
+      ]
+    },
+    {
+      "id": "sandbox-patch-validation",
+      "repository_url": "https://github.com/laksh150806/ForgeAI",
+      "task": "Find the code that applies proposed patches and runs isolated validation.",
+      "expected_files": [
+        "apps/api/app/services/sandbox_validation.py"
+      ],
+      "expected_symbols": [
+        "validate_patches"
+      ]
+    },
+    {
+      "id": "pr-approval-gate",
+      "repository_url": "https://github.com/laksh150806/ForgeAI",
+      "task": "Find the code that requires approval and fresh validation before opening a GitHub pull request.",
+      "expected_files": [
+        "apps/api/app/services/github_pr.py"
+      ],
+      "expected_symbols": [
+        "create_validated_pull_request"
+      ]
+    }
+  ]
+}

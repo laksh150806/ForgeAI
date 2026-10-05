@@ -84,6 +84,31 @@ type Validation = {
   notes: string[];
 };
 
+type BenchmarkResult = {
+  metrics: {
+    cases: number;
+    top1_accuracy: number;
+    topk_recall: number;
+    mean_reciprocal_rank: number;
+    symbol_accuracy: number | null;
+    average_latency_ms: number;
+    patch_generation_rate: number | null;
+    validation_pass_rate: number | null;
+    pr_gate_accuracy: number | null;
+  };
+  results: {
+    id: string;
+    repository: string;
+    retrieval_mode: string;
+    latency_ms: number;
+    ranked_files: string[];
+    top1_hit: boolean;
+    topk_recall: number;
+    reciprocal_rank: number;
+    symbol_hit: boolean | null;
+  }[];
+};
+
 type PullRequestResult = {
   repository: string;
   branch: string | null;
@@ -149,9 +174,10 @@ export default function Home() {
   const [validation, setValidation] = useState<Validation | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
   const [prResult, setPrResult] = useState<PullRequestResult | null>(null);
+  const [benchmark, setBenchmark] = useState<BenchmarkResult | null>(null);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | "workflow" | "pr" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -310,6 +336,55 @@ export default function Home() {
     }
   }
 
+  async function runBenchmark() {
+    setLoading("benchmark");
+    setError("");
+    setBenchmark(null);
+
+    const cases = [
+      {
+        id: "github-url-validation",
+        repository_url: "https://github.com/laksh150806/ForgeAI",
+        task: "Find the implementation responsible for validating GitHub repository URLs.",
+        expected_files: ["apps/api/app/services/github_client.py"],
+        expected_symbols: ["parse_github_repository_url"],
+      },
+      {
+        id: "sandbox-patch-validation",
+        repository_url: "https://github.com/laksh150806/ForgeAI",
+        task: "Find the code that applies proposed patches and runs isolated validation.",
+        expected_files: ["apps/api/app/services/sandbox_validation.py"],
+        expected_symbols: ["validate_patches"],
+      },
+      {
+        id: "pr-approval-gate",
+        repository_url: "https://github.com/laksh150806/ForgeAI",
+        task: "Find the code that requires approval and fresh validation before opening a GitHub pull request.",
+        expected_files: ["apps/api/app/services/github_pr.py"],
+        expected_symbols: ["create_validated_pull_request"],
+      },
+    ];
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/evaluation/benchmark`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          cases,
+          top_k: 3,
+          run_full_pipeline: false,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Benchmark failed.");
+      setBenchmark(payload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Benchmark failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
   async function searchCode(event: FormEvent) {
     event.preventDefault();
     setLoading("code");
@@ -378,11 +453,53 @@ export default function Home() {
             >
               {loading === "workflow" ? "Running workflow…" : "Run full workflow"}
             </button>
+            <button
+              className="secondaryButton"
+              disabled={loading !== null}
+              type="button"
+              onClick={runBenchmark}
+            >
+              {loading === "benchmark" ? "Running benchmark…" : "Run benchmark"}
+            </button>
           </div>
         </form>
 
         {error && <p className="error">{error}</p>}
       </section>
+
+      {benchmark && (
+        <section className="panel benchmarkPanel">
+          <div className="analysisHeader">
+            <div>
+              <span className="label">EVALUATION BENCHMARK</span>
+              <h2>Measured retrieval quality</h2>
+              <p>{benchmark.metrics.cases} gold-labeled cases</p>
+            </div>
+          </div>
+
+          <div className="benchmarkMetrics">
+            <article><span>Top-1 accuracy</span><strong>{Math.round(benchmark.metrics.top1_accuracy * 100)}%</strong></article>
+            <article><span>Top-3 recall</span><strong>{Math.round(benchmark.metrics.topk_recall * 100)}%</strong></article>
+            <article><span>MRR</span><strong>{benchmark.metrics.mean_reciprocal_rank.toFixed(2)}</strong></article>
+            <article><span>Avg latency</span><strong>{benchmark.metrics.average_latency_ms.toFixed(0)}ms</strong></article>
+          </div>
+
+          <div className="benchmarkCases">
+            {benchmark.results.map((item) => (
+              <article key={item.id}>
+                <div className="commandHeader">
+                  <strong>{item.id}</strong>
+                  <span>{item.top1_hit ? "Top-1 hit" : "Top-1 miss"} · {item.latency_ms}ms</span>
+                </div>
+                <p>
+                  Recall@3 {Math.round(item.topk_recall * 100)}% · MRR {item.reciprocal_rank.toFixed(2)} · {item.retrieval_mode}
+                </p>
+                <code>{item.ranked_files[0] ?? "No result"}</code>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {workflowRun && (
         <section className="panel tracePanel">
