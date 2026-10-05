@@ -113,8 +113,9 @@ async def create_engineering_plan(
     repository_url: str,
     task: str,
     generate_patch: bool = True,
+    investigation_result=None,
 ) -> PlanResponse:
-    investigation = await investigate_repository(
+    investigation = investigation_result or await investigate_repository(
         repository_url=repository_url,
         task=task,
         limit=6,
