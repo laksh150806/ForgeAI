@@ -327,6 +327,7 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? "Workflow run failed.");
       setWorkflowRun(payload);
+      await loadRecentRuns();
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Workflow run failed.");
     } finally {
