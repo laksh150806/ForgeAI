@@ -40,3 +40,21 @@ def test_memory_trace_store_round_trip(monkeypatch) -> None:
     assert payload["task"] == "Find the failing path"
     assert payload["status"] == "completed"
     assert payload["metrics"]["total_duration_ms"] == 123
+
+
+def test_supabase_database_url_enforces_ssl(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql://postgres.project:secret@aws-0-region.pooler.supabase.com:5432/postgres",
+    )
+    value = database_url()
+    assert "sslmode=require" in value
+
+
+def test_database_url_keeps_existing_sslmode(monkeypatch) -> None:
+    monkeypatch.setenv(
+        "DATABASE_URL",
+        "postgresql://postgres.project:secret@aws-0-region.pooler.supabase.com:5432/postgres?sslmode=verify-full",
+    )
+    value = database_url()
+    assert value.count("sslmode=") == 1
