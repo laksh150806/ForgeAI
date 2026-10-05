@@ -1,9 +1,9 @@
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, HTTPException, Query
 
 from app.schemas.observability import WorkflowRunRequest, WorkflowRunResponse
 from app.schemas.runtime import RecentRun
 from app.services.observability import execute_workflow
-from app.services.trace_store import recent_runs, save_run
+from app.services.trace_store import get_run, recent_runs, save_run
 
 
 router = APIRouter(prefix="/api/v1/runs", tags=["observability"])
@@ -33,3 +33,11 @@ async def get_recent_runs(
 ) -> list[RecentRun]:
     rows = await recent_runs(limit)
     return [RecentRun(**row) for row in rows]
+
+
+@router.get("/{run_id}", response_model=WorkflowRunResponse)
+async def get_run_detail(run_id: str) -> WorkflowRunResponse:
+    payload = await get_run(run_id)
+    if payload is None:
+        raise HTTPException(status_code=404, detail="Trace run not found.")
+    return WorkflowRunResponse.model_validate(payload)
