@@ -69,3 +69,24 @@ def test_aggregate_metrics() -> None:
     assert metrics.mean_reciprocal_rank == 0.75
     assert metrics.average_latency_ms == 200
     assert metrics.pr_gate_accuracy == 1.0
+
+
+def test_benchmark_can_reuse_one_repository_index_shape() -> None:
+    from app.services.code_intelligence import CodeChunk, RepositoryCodeIndex
+
+    index = RepositoryCodeIndex(
+        repository="owner/repo",
+        indexed_files=1,
+        chunks=[
+            CodeChunk(
+                path="app/auth.py",
+                language="Python",
+                text="def validate_token(): pass",
+                symbols=[],
+                tokens=["validate", "token"],
+            )
+        ],
+    )
+    assert index.repository == "owner/repo"
+    assert index.indexed_files == 1
+    assert len(index.chunks) == 1
