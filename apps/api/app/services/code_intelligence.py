@@ -8,6 +8,7 @@ from dataclasses import dataclass
 from pathlib import PurePosixPath
 
 from app.schemas.code_intelligence import CodeEvidence, CodeSearchResponse, CodeSymbol
+from app.services.embeddings import OpenAIEmbeddingProvider, cosine_similarity
 from app.services.github_client import GitHubClient, GitHubRepositoryRef, parse_github_repository_url
 from app.services.repository_intelligence import classify_path
 
@@ -231,6 +232,38 @@ async def search_repository_code(repository_url: str, task: str, limit: int = 8)
 
     ranked.sort(key=lambda item: item[0], reverse=True)
 
+    retrieval_mode = "lexical"
+    reranked = ranked
+
+    # Hybrid stage: semantically rerank the strongest lexical candidates.
+    semantic_pool = ranked[: min(30, len(ranked))]
+    provider = OpenAIEmbeddingProvider()
+    if semantic_pool:
+        texts = [task] + [
+            f"{chunk.path}\n"
+            + " ".join(symbol.name for symbol in chunk.symbols)
+            + "\n"
+            + chunk.text[:5000]
+            for _, chunk, _ in semantic_pool
+        ]
+        vectors = await provider.embed(texts)
+        if vectors and len(vectors) == len(texts):
+            retrieval_mode = "hybrid"
+            query_vector = vectors[0]
+            max_lexical = max((item[0] for item in semantic_pool), default=1.0) or 1.0
+            hybrid = []
+            for index, (lexical_score, chunk, reasons) in enumerate(semantic_pool, start=1):
+                semantic_score = max(0.0, cosine_similarity(query_vector, vectors[index]))
+                lexical_norm = lexical_score / max_lexical
+                combined = (0.58 * lexical_norm) + (0.42 * semantic_score)
+                hybrid_reasons = reasons + [
+                    f"Semantic similarity: {semantic_score:.3f}",
+                    f"Hybrid score: {combined:.3f}",
+                ]
+                hybrid.append((combined * 100, chunk, hybrid_reasons))
+            hybrid.sort(key=lambda item: item[0], reverse=True)
+            reranked = hybrid
+
     results = [
         CodeEvidence(
             path=chunk.path,
@@ -240,12 +273,13 @@ async def search_repository_code(repository_url: str, task: str, limit: int = 8)
             symbols=chunk.symbols[:10],
             snippet=_snippet(chunk.text, query_terms),
         )
-        for score, chunk, reasons in ranked[:limit]
+        for score, chunk, reasons in reranked[:limit]
     ]
 
     return CodeSearchResponse(
         repository=ref.full_name,
         task=task,
+        retrieval_mode=retrieval_mode,
         indexed_files=len(candidates),
         indexed_chunks=len(chunks),
         results=results,

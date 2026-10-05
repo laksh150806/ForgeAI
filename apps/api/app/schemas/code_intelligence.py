@@ -26,6 +26,7 @@ class CodeEvidence(BaseModel):
 class CodeSearchResponse(BaseModel):
     repository: str
     task: str
+    retrieval_mode: str
     indexed_files: int
     indexed_chunks: int
     results: list[CodeEvidence]

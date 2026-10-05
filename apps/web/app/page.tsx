@@ -28,9 +28,23 @@ type SearchResult = {
 type CodeSearch = {
   repository: string;
   task: string;
+  retrieval_mode: string;
   indexed_files: number;
   indexed_chunks: number;
   results: SearchResult[];
+};
+
+type Investigation = {
+  repository: string;
+  task: string;
+  retrieval_mode: string;
+  hypothesis: {
+    summary: string;
+    confidence: number;
+    rationale: string[];
+  };
+  evidence: SearchResult[];
+  suggested_next_actions: string[];
 };
 
 const stages = [
@@ -46,8 +60,9 @@ export default function Home() {
   const [task, setTask] = useState("Find the code responsible for repository URL validation and GitHub API failures.");
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [search, setSearch] = useState<CodeSearch | null>(null);
+  const [investigation, setInvestigation] = useState<Investigation | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -67,6 +82,26 @@ export default function Home() {
       setAnalysis(payload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Repository analysis failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function runInvestigation() {
+    setLoading("investigate");
+    setError("");
+    setInvestigation(null);
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/investigations/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repository_url: repositoryUrl, task, limit: 6 }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Investigation failed.");
+      setInvestigation(payload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Investigation failed.");
     } finally {
       setLoading(null);
     }
@@ -112,9 +147,19 @@ export default function Home() {
 
         <form className="taskForm" onSubmit={searchCode}>
           <textarea value={task} onChange={(e) => setTask(e.target.value)} required />
-          <button disabled={loading !== null} type="submit">
-            {loading === "code" ? "Searching code…" : "Find relevant code"}
-          </button>
+          <div className="taskActions">
+            <button disabled={loading !== null} type="submit">
+              {loading === "code" ? "Searching code…" : "Find relevant code"}
+            </button>
+            <button
+              className="secondaryButton"
+              disabled={loading !== null}
+              type="button"
+              onClick={runInvestigation}
+            >
+              {loading === "investigate" ? "Investigating…" : "Run investigation"}
+            </button>
+          </div>
         </form>
 
         {error && <p className="error">{error}</p>}
@@ -139,13 +184,43 @@ export default function Home() {
         </section>
       )}
 
+      {investigation && (
+        <section className="panel investigation">
+          <div className="analysisHeader">
+            <div>
+              <span className="label">INVESTIGATION AGENT</span>
+              <h2>{investigation.hypothesis.summary}</h2>
+              <p>
+                Confidence {Math.round(investigation.hypothesis.confidence * 100)}% · {investigation.retrieval_mode}
+              </p>
+            </div>
+          </div>
+          <div className="investigationGrid">
+            <div>
+              <h3>Why ForgeAI thinks this</h3>
+              <ul>
+                {investigation.hypothesis.rationale.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+            </div>
+            <div>
+              <h3>Suggested next actions</h3>
+              <ol>
+                {investigation.suggested_next_actions.map((item) => <li key={item}>{item}</li>)}
+              </ol>
+            </div>
+          </div>
+        </section>
+      )}
+
       {search && (
         <section className="panel retrieval">
           <div className="analysisHeader">
             <div>
               <span className="label">TASK-TO-CODE RETRIEVAL</span>
               <h2>Relevant engineering evidence</h2>
-              <p>{search.indexed_files} files · {search.indexed_chunks} code chunks indexed</p>
+              <p>
+                {search.indexed_files} files · {search.indexed_chunks} code chunks indexed · {search.retrieval_mode}
+              </p>
             </div>
           </div>
 
