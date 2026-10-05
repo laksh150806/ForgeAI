@@ -96,8 +96,8 @@ Web: `http://localhost:3000`
 - [x] Lexical retrieval + symbol-aware ranking
 - [x] Task-to-file retrieval layer
 - [x] Structured investigation agent
-- [ ] Structured engineering plan
-- [ ] Patch/diff generation
+- [x] Structured engineering plan
+- [x] Patch/diff generation
 - [ ] Sandboxed validation
 - [ ] Execution traces and metrics
 - [ ] Human-approved GitHub PR creation
@@ -183,3 +183,26 @@ The response contains a ranked evidence set, a bounded confidence score, a conci
 implementation-surface hypothesis, rationale, and next actions. The current investigator
 is evidence-driven and deterministic; model-based root-cause synthesis can be added
 behind the same response contract later.
+
+
+## Engineering plans and patch proposals
+
+Generate an evidence-backed implementation plan and, when a model key is configured,
+a review-only unified diff:
+
+```http
+POST /api/v1/plans/generate
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/laksh150806/ForgeAI",
+  "task": "Fix repository URL validation for valid GitHub URLs.",
+  "generate_patch": true
+}
+```
+
+Planning always works from investigation evidence. Patch generation is optional and uses
+`OPENAI_API_KEY` or `LLM_API_KEY` with `PATCH_MODEL` (default `gpt-5-mini`).
+ForgeAI only accepts patches for files that were actually loaded into model context.
+Every patch is preview-only and `approval_required` remains true; Phase 5 performs no
+repository writes.
