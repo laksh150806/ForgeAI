@@ -662,3 +662,122 @@ button {
 @media (max-width: 760px) {
   .benchmarkMetrics { grid-template-columns: 1fr 1fr; }
 }
+
+
+.topBar {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:18px;
+  margin-bottom:46px;
+}
+
+.brandLockup {
+  display:flex;
+  gap:12px;
+  align-items:center;
+}
+
+.brandMark {
+  width:38px;
+  height:38px;
+  display:grid;
+  place-items:center;
+  border-radius:11px;
+  background:linear-gradient(135deg,#d7f1ff,#6cc5f2);
+  color:#06101a;
+  font-weight:900;
+}
+
+.brandLockup div {
+  display:grid;
+  gap:2px;
+}
+
+.brandLockup strong {
+  letter-spacing:-.02em;
+}
+
+.brandLockup span:not(.brandMark) {
+  color:#75869d;
+  font-size:.72rem;
+}
+
+.livePill {
+  display:flex;
+  align-items:center;
+  gap:8px;
+  border:1px solid #264d3d;
+  background:#0b1b15;
+  color:#9ce7bf;
+  border-radius:999px;
+  padding:7px 11px;
+  font-size:.75rem;
+  font-weight:700;
+}
+
+.livePill span {
+  width:7px;
+  height:7px;
+  border-radius:50%;
+  background:#5ee6a8;
+  box-shadow:0 0 14px #5ee6a8;
+}
+
+.capabilityStrip {
+  display:flex;
+  gap:8px;
+  flex-wrap:wrap;
+  max-width:980px;
+  margin:24px 0 8px;
+}
+
+.capabilityStrip span {
+  border:1px solid #20334a;
+  background:#0b1420;
+  color:#a9bfd5;
+  border-radius:999px;
+  padding:7px 10px;
+  font-size:.75rem;
+}
+
+.productProof {
+  display:grid;
+  grid-template-columns:repeat(3,1fr);
+  gap:14px;
+  margin:0 0 24px;
+}
+
+.productProof article {
+  border:1px solid #1b2d42;
+  background:linear-gradient(180deg,#0c1521,#09111a);
+  border-radius:18px;
+  padding:20px;
+}
+
+.productProof span {
+  display:block;
+  color:#67c7f3;
+  font-family:ui-monospace,monospace;
+  font-size:.75rem;
+  margin-bottom:18px;
+}
+
+.productProof strong {
+  display:block;
+  font-size:1rem;
+  margin-bottom:8px;
+}
+
+.productProof p {
+  color:#8fa1b8;
+  line-height:1.6;
+  margin:0;
+  font-size:.88rem;
+}
+
+@media (max-width:760px) {
+  .topBar { align-items:flex-start; }
+  .brandLockup span:not(.brandMark) { display:none; }
+  .productProof { grid-template-columns:1fr; }
+}

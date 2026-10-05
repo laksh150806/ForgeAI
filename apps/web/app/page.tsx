@@ -409,12 +409,31 @@ export default function Home() {
   return (
     <main className="shell">
       <section className="hero">
-        <div className="eyebrow">FORGEAI / ENGINEERING INTELLIGENCE</div>
-        <h1>Understand the code that matters.</h1>
+        <div className="topBar">
+          <div className="brandLockup">
+            <span className="brandMark">F</span>
+            <div>
+              <strong>ForgeAI</strong>
+              <span>Autonomous Software Engineering Platform</span>
+            </div>
+          </div>
+          <div className="livePill"><span /> Production</div>
+        </div>
+
+        <div className="eyebrow">REPOSITORY INTELLIGENCE · AGENTS · VALIDATION · EVALUATION</div>
+        <h1>From bug report to validated engineering evidence.</h1>
         <p className="lede">
-          ForgeAI maps a repository, extracts code structure, and ranks the files and
-          symbols most relevant to an engineering task before an agent proposes changes.
+          ForgeAI investigates repositories, ranks relevant code, builds an engineering plan,
+          proposes patches, validates them behind safety gates, and produces auditable execution traces.
         </p>
+
+        <div className="capabilityStrip">
+          <span>Hybrid retrieval</span>
+          <span>Evidence-backed investigation</span>
+          <span>Patch planning</span>
+          <span>Sandbox validation</span>
+          <span>GitHub PR automation</span>
+        </div>
 
         <form className="repoForm" onSubmit={analyzeRepository}>
           <input value={repositoryUrl} onChange={(e) => setRepositoryUrl(e.target.value)} required />
@@ -781,6 +800,24 @@ export default function Home() {
           </div>
         </section>
       )}
+
+      <section className="productProof">
+        <article>
+          <span>01</span>
+          <strong>Evidence before generation</strong>
+          <p>ForgeAI retrieves and ranks concrete code before planning or proposing changes.</p>
+        </article>
+        <article>
+          <span>02</span>
+          <strong>Validation before writes</strong>
+          <p>Repository mutation stays gated behind explicit approval and fresh server-side validation.</p>
+        </article>
+        <article>
+          <span>03</span>
+          <strong>Measured agent quality</strong>
+          <p>Gold-labeled benchmarks report localization accuracy, recall, MRR, latency, and gate behavior.</p>
+        </article>
+      </section>
 
       <section id="pipeline" className="panel">
         <div>

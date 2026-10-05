@@ -4,6 +4,12 @@
 
 ForgeAI is a production-oriented AI engineering platform designed to understand software repositories, investigate engineering tasks and incidents, propose code changes, validate them, and produce an auditable engineering report.
 
+## Live deployment
+
+- Web: https://forgeai-web-irot.onrender.com
+- API: https://forgeai-api-ok42.onrender.com
+- Seed benchmark: https://forgeai-api-ok42.onrender.com/api/v1/evaluation/seed
+
 ## Vision
 
 ForgeAI is not a generic coding chatbot. The target workflow is:
