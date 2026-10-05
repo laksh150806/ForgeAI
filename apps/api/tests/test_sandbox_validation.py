@@ -23,7 +23,7 @@ def test_accepts_normal_patch_path() -> None:
             unified_diff="--- a/apps/api/app/main.py\n+++ b/apps/api/app/main.py\n",
         )
     ]
-    assert safe_patch_paths(patches) is True
+    assert _safe_patch_paths(patches) is True
 
 
 def test_detects_python_validation(tmp_path: Path) -> None:
@@ -36,7 +36,7 @@ def test_detects_python_validation(tmp_path: Path) -> None:
 
 def test_detects_node_validation(tmp_path: Path) -> None:
     (tmp_path / "package.json").write_text("{}")
-    specs = validation_specs(tmp_path)
+    specs = _validation_specs(tmp_path)
     labels = [item[0] for item in specs]
     assert "Node syntax/build" in labels
     assert "Node tests" in labels
