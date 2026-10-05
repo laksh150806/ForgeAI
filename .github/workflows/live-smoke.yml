@@ -92,6 +92,43 @@ jobs:
           print("Generate Plan live smoke: OK")
           PY
 
+      - name: Check live trace history
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl --fail --show-error --silent             -X POST             -H "Content-Type: application/json"             -d '{"repository_url":"https://github.com/laksh150806/ForgeAI","task":"Find the code responsible for GitHub repository URL validation.","generate_patch":false,"validate_patch":false}'             https://forgeai-api-ok42.onrender.com/api/v1/runs/execute             | tee /tmp/run.json
+
+          run_id=$(python - <<'PY'
+          import json
+          with open('/tmp/run.json') as f:
+              data = json.load(f)
+          assert data["status"] in {"completed", "blocked"}
+          assert data["stages"]
+          print(data["run_id"])
+          PY
+          )
+
+          curl --fail --show-error --silent             "https://forgeai-api-ok42.onrender.com/api/v1/runs/recent?limit=8"             | tee /tmp/recent.json
+
+          RUN_ID="$run_id" python - <<'PY'
+          import json, os
+          with open('/tmp/recent.json') as f:
+              rows = json.load(f)
+          assert any(row["run_id"] == os.environ["RUN_ID"] for row in rows)
+          PY
+
+          curl --fail --show-error --silent             "https://forgeai-api-ok42.onrender.com/api/v1/runs/$run_id"             | tee /tmp/run-detail.json
+
+          RUN_ID="$run_id" python - <<'PY'
+          import json, os
+          with open('/tmp/run-detail.json') as f:
+              data = json.load(f)
+          assert data["run_id"] == os.environ["RUN_ID"]
+          assert data["metrics"]["stages_completed"] >= 1
+          print("Trace history live smoke: OK")
+          PY
+
       - name: Check live web
         run: |
           curl --fail --show-error --silent             https://forgeai-web-irot.onrender.com             | grep -q "ForgeAI"
