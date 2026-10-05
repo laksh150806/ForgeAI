@@ -95,6 +95,7 @@ Web: `http://localhost:3000`
 - [x] AST-aware code parsing
 - [x] Lexical retrieval + symbol-aware ranking
 - [x] Task-to-file retrieval layer
+- [x] Structured investigation agent
 - [ ] Structured engineering plan
 - [ ] Patch/diff generation
 - [ ] Sandboxed validation
@@ -157,3 +158,28 @@ Content-Type: application/json
 ForgeAI extracts source symbols, chunks code, normalizes identifier tokens, and ranks
 evidence using task-term relevance with path and symbol boosts. Semantic embeddings and
 persistent indexing are planned as the next retrieval upgrade.
+
+
+## Hybrid retrieval and investigation
+
+When `OPENAI_API_KEY` is configured, ForgeAI reranks strong lexical candidates with
+semantic embeddings using `text-embedding-3-small` by default. Without that key,
+retrieval automatically falls back to the deterministic lexical/symbol-aware path.
+
+Run a structured investigation:
+
+```http
+POST /api/v1/investigations/run
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/laksh150806/ForgeAI",
+  "task": "Repository URL validation is rejecting valid GitHub repositories.",
+  "limit": 6
+}
+```
+
+The response contains a ranked evidence set, a bounded confidence score, a concise
+implementation-surface hypothesis, rationale, and next actions. The current investigator
+is evidence-driven and deterministic; model-based root-cause synthesis can be added
+behind the same response contract later.
