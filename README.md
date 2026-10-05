@@ -28,7 +28,7 @@ Human-approved PR
 
 ## Current status
 
-**Phase 1 — Foundation**
+**Phase 10 — Production hardening**
 
 The repository currently contains:
 
@@ -102,6 +102,8 @@ Web: `http://localhost:3000`
 - [x] Execution traces and metrics
 - [x] Human-approved GitHub PR creation
 - [x] Evaluation benchmark suite
+- [x] Production deployment hardening
+- [x] Persistent execution traces (optional Postgres)
 
 ## Engineering principles
 
@@ -315,3 +317,20 @@ With `run_full_pipeline=true`, the same harness also measures:
 
 The seed dataset lives at `benchmarks/forgeai.json`. Reported resume/demo numbers should
 come from actual benchmark runs; ForgeAI does not hard-code or invent performance claims.
+
+
+## Production deployment
+
+ForgeAI is designed to deploy as separate web and API services with optional Postgres
+trace persistence. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+Production hardening includes:
+
+- environment-driven CORS via `CORS_ORIGINS`
+- liveness at `GET /health`
+- database-aware readiness at `GET /ready`
+- best-effort Postgres persistence for workflow traces
+- `GET /api/v1/runs/recent` for recent persisted runs
+- secrets supplied only through deployment environment variables
+
+When `DATABASE_URL` is absent, ForgeAI remains functional and run persistence is disabled.
