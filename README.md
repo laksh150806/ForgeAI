@@ -342,7 +342,7 @@ come from actual benchmark runs; ForgeAI does not hard-code or invent performanc
 
 ## Production deployment
 
-ForgeAI is designed to deploy as separate web and API services with optional Postgres
+ForgeAI is designed to deploy as separate web and API services with optional **Supabase Free Postgres**
 trace persistence. See [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
 
 Production hardening includes:
@@ -354,4 +354,6 @@ Production hardening includes:
 - `GET /api/v1/runs/recent` for recent persisted runs
 - secrets supplied only through deployment environment variables
 
-When `DATABASE_URL` is absent, ForgeAI remains functional and run persistence is disabled.
+When `DATABASE_URL` is absent, ForgeAI remains functional with a bounded in-memory trace history.
+For zero-cost durable traces, use the Supabase Free shared session pooler as documented in
+[docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
