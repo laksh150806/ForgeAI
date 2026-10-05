@@ -297,3 +297,102 @@ button {
 @media (max-width: 760px) {
   .investigationGrid { grid-template-columns: 1fr; }
 }
+
+
+.planPanel {
+  margin-bottom: 24px;
+  border-color: #33435d;
+}
+
+.approvalBadge {
+  border: 1px solid #6b4c23;
+  background: #241a0e;
+  color: #facc7b;
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: .8rem;
+  font-weight: 700;
+}
+
+.planGrid {
+  display: grid;
+  grid-template-columns: 1.35fr .85fr;
+  gap: 28px;
+  margin-top: 22px;
+}
+
+.planSteps {
+  display: grid;
+  gap: 12px;
+}
+
+.planSteps article {
+  border: 1px solid #1e2c41;
+  border-radius: 14px;
+  padding: 16px;
+  background: #0b121d;
+}
+
+.planSteps article > span {
+  display: block;
+  color: #64748b;
+  font-family: ui-monospace, monospace;
+  margin-bottom: 8px;
+}
+
+.planSteps p, .planSteps small, .planGrid li {
+  color: #9aacbf;
+  line-height: 1.6;
+}
+
+.commandList {
+  display: grid;
+  gap: 8px;
+}
+
+.commandList code {
+  background: #08101a;
+  border: 1px solid #1c2c40;
+  color: #bde7ff;
+  border-radius: 9px;
+  padding: 9px 11px;
+}
+
+.patches {
+  margin-top: 28px;
+}
+
+.patchCard {
+  border: 1px solid #24364d;
+  border-radius: 16px;
+  background: #09111b;
+  padding: 16px;
+  margin-top: 12px;
+}
+
+.patchHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.patchHeader span {
+  color: #facc7b;
+  font-size: .8rem;
+}
+
+.patchCard pre {
+  white-space: pre-wrap;
+  overflow-x: auto;
+  background: #050a10;
+  border: 1px solid #152338;
+  border-radius: 12px;
+  padding: 14px;
+  color: #d5dde8;
+  font-size: .76rem;
+  line-height: 1.5;
+}
+
+@media (max-width: 760px) {
+  .planGrid { grid-template-columns: 1fr; }
+}
