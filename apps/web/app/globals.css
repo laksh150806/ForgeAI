@@ -396,3 +396,81 @@ button {
 @media (max-width: 760px) {
   .planGrid { grid-template-columns: 1fr; }
 }
+
+
+.validateAction {
+  margin-top: 22px;
+}
+
+.validationPanel {
+  margin-bottom: 24px;
+}
+
+.validationPass {
+  border-color: #275744;
+}
+
+.validationFail {
+  border-color: #5d3434;
+}
+
+.validationBadge {
+  border-radius: 999px;
+  padding: 8px 12px;
+  font-size: .8rem;
+  font-weight: 700;
+}
+
+.validationBadge.safe {
+  border: 1px solid #2e6d54;
+  color: #9ce7bf;
+  background: #0d2119;
+}
+
+.validationBadge.blocked {
+  border: 1px solid #6d3939;
+  color: #ffb1b1;
+  background: #261111;
+}
+
+.validationCommands {
+  display: grid;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.validationCommands article {
+  border: 1px solid #1e2e42;
+  background: #09111b;
+  border-radius: 14px;
+  padding: 15px;
+}
+
+.commandHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+}
+
+.commandHeader span {
+  color: #8fa0b8;
+  font-size: .8rem;
+}
+
+.validationCommands pre {
+  margin-top: 12px;
+  max-height: 280px;
+  overflow: auto;
+  white-space: pre-wrap;
+  background: #050a10;
+  border-radius: 10px;
+  padding: 12px;
+  color: #cad5e2;
+  font-size: .76rem;
+}
+
+.validationNotes li {
+  color: #9aacbf;
+  line-height: 1.6;
+  margin-bottom: 8px;
+}

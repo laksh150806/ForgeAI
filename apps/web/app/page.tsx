@@ -62,6 +62,28 @@ type Plan = {
   patches: Patch[];
 };
 
+type Validation = {
+  repository: string;
+  sandbox: string;
+  status: string;
+  passed: boolean;
+  safe_to_propose_pr: boolean;
+  patch: {
+    status: string;
+    files: string[];
+    message: string;
+  };
+  commands: {
+    command: string;
+    status: string;
+    exit_code: number | null;
+    duration_ms: number;
+    stdout: string;
+    stderr: string;
+  }[];
+  notes: string[];
+};
+
 type Investigation = {
   repository: string;
   task: string;
@@ -90,8 +112,9 @@ export default function Home() {
   const [search, setSearch] = useState<CodeSearch | null>(null);
   const [investigation, setInvestigation] = useState<Investigation | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
+  const [validation, setValidation] = useState<Validation | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -151,6 +174,35 @@ export default function Home() {
       setPlan(payload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Planning failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function validatePatch() {
+    if (!plan || plan.patches.length === 0) {
+      setError("Generate a patch before running validation.");
+      return;
+    }
+
+    setLoading("validate");
+    setError("");
+    setValidation(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/validation/run`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          patches: plan.patches,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Validation failed.");
+      setValidation(payload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Validation failed.");
     } finally {
       setLoading(null);
     }
@@ -328,6 +380,52 @@ export default function Home() {
               No patch was generated. The engineering plan is still available for review.
             </p>
           )}
+
+          {plan.patches.length > 0 && (
+            <div className="validateAction">
+              <button disabled={loading !== null} type="button" onClick={validatePatch}>
+                {loading === "validate" ? "Validating in sandbox…" : "Validate patch in sandbox"}
+              </button>
+            </div>
+          )}
+        </section>
+      )}
+
+      {validation && (
+        <section className={`panel validationPanel ${validation.passed ? "validationPass" : "validationFail"}`}>
+          <div className="analysisHeader">
+            <div>
+              <span className="label">SANDBOX VALIDATION</span>
+              <h2>{validation.passed ? "Patch validated" : "Validation did not pass"}</h2>
+              <p>
+                Sandbox {validation.sandbox} · Patch {validation.patch.status} · {validation.status}
+              </p>
+            </div>
+            <span className={`validationBadge ${validation.safe_to_propose_pr ? "safe" : "blocked"}`}>
+              {validation.safe_to_propose_pr ? "PR gate open" : "PR gate blocked"}
+            </span>
+          </div>
+
+          <div className="validationCommands">
+            {validation.commands.map((command, index) => (
+              <article key={`${command.command}-${index}`}>
+                <div className="commandHeader">
+                  <strong>{command.command}</strong>
+                  <span>{command.status} · {command.duration_ms}ms</span>
+                </div>
+                {(command.stdout || command.stderr) && (
+                  <pre>{[command.stdout, command.stderr].filter(Boolean).join("\n")}</pre>
+                )}
+              </article>
+            ))}
+          </div>
+
+          <div className="validationNotes">
+            <h3>Safety notes</h3>
+            <ul>
+              {validation.notes.map((note) => <li key={note}>{note}</li>)}
+            </ul>
+          </div>
         </section>
       )}
 
