@@ -84,6 +84,30 @@ type Validation = {
   notes: string[];
 };
 
+type WorkflowRun = {
+  run_id: string;
+  repository: string;
+  task: string;
+  status: string;
+  stages: {
+    name: string;
+    status: string;
+    duration_ms: number;
+    details: Record<string, string | number | boolean | null>;
+    error: string | null;
+  }[];
+  metrics: {
+    total_duration_ms: number;
+    stages_completed: number;
+    stages_failed: number;
+    retrieval_mode: string | null;
+    evidence_count: number;
+    patch_count: number;
+    validation_commands: number;
+    pr_gate_open: boolean;
+  };
+};
+
 type Investigation = {
   repository: string;
   task: string;
@@ -113,8 +137,9 @@ export default function Home() {
   const [investigation, setInvestigation] = useState<Investigation | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
+  const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | "workflow" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -208,6 +233,32 @@ export default function Home() {
     }
   }
 
+  async function runFullWorkflow() {
+    setLoading("workflow");
+    setError("");
+    setWorkflowRun(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/runs/execute`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          task,
+          generate_patch: true,
+          validate_patch: true,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Workflow run failed.");
+      setWorkflowRun(payload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Workflow run failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
   async function searchCode(event: FormEvent) {
     event.preventDefault();
     setLoading("code");
@@ -268,11 +319,65 @@ export default function Home() {
             >
               {loading === "plan" ? "Planning…" : "Generate plan + patch"}
             </button>
+            <button
+              className="secondaryButton"
+              disabled={loading !== null}
+              type="button"
+              onClick={runFullWorkflow}
+            >
+              {loading === "workflow" ? "Running workflow…" : "Run full workflow"}
+            </button>
           </div>
         </form>
 
         {error && <p className="error">{error}</p>}
       </section>
+
+      {workflowRun && (
+        <section className="panel tracePanel">
+          <div className="analysisHeader">
+            <div>
+              <span className="label">EXECUTION TRACE</span>
+              <h2>Run #{workflowRun.run_id}</h2>
+              <p>
+                {workflowRun.status} · {(workflowRun.metrics.total_duration_ms / 1000).toFixed(2)}s total
+              </p>
+            </div>
+            <span className={`validationBadge ${workflowRun.metrics.pr_gate_open ? "safe" : "blocked"}`}>
+              {workflowRun.metrics.pr_gate_open ? "PR gate open" : "PR gate blocked"}
+            </span>
+          </div>
+
+          <div className="traceMetrics">
+            <article><span>Evidence</span><strong>{workflowRun.metrics.evidence_count}</strong></article>
+            <article><span>Patches</span><strong>{workflowRun.metrics.patch_count}</strong></article>
+            <article><span>Validation checks</span><strong>{workflowRun.metrics.validation_commands}</strong></article>
+            <article><span>Retrieval</span><strong>{workflowRun.metrics.retrieval_mode ?? "n/a"}</strong></article>
+          </div>
+
+          <div className="timeline">
+            {workflowRun.stages.map((stage, index) => (
+              <article className="timelineStage" key={`${stage.name}-${index}`}>
+                <div className="timelineMarker">{String(index + 1).padStart(2, "0")}</div>
+                <div className="timelineBody">
+                  <div className="commandHeader">
+                    <strong>{stage.name.replaceAll("_", " ")}</strong>
+                    <span>{stage.status} · {stage.duration_ms}ms</span>
+                  </div>
+                  {Object.keys(stage.details).length > 0 && (
+                    <div className="traceDetails">
+                      {Object.entries(stage.details).map(([key, value]) => (
+                        <code key={key}>{key}: {String(value)}</code>
+                      ))}
+                    </div>
+                  )}
+                  {stage.error && <p className="traceError">{stage.error}</p>}
+                </div>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
 
       {analysis && (
         <section className="analysis panel">
