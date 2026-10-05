@@ -90,8 +90,8 @@ Web: `http://localhost:3000`
 
 - [x] Project foundation
 - [x] Web + API skeleton
-- [ ] GitHub repository ingestion
-- [ ] Repository file inventory
+- [x] GitHub repository ingestion
+- [x] Repository file inventory
 - [ ] AST-aware code parsing
 - [ ] Semantic + lexical retrieval
 - [ ] Task-to-file investigation agent
@@ -119,3 +119,21 @@ The project is designed to demonstrate practical skills across:
 **AI engineering · agents · RAG · code intelligence · backend · frontend · databases · GitHub automation · testing · security · DevOps · observability · evaluation**
 
 See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the current architecture.
+
+
+## Repository Intelligence API
+
+Analyze a public GitHub repository:
+
+```http
+POST /api/v1/repositories/analyze
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/laksh150806/ForgeAI"
+}
+```
+
+The response includes repository metadata, file inventory, source-language distribution,
+important project files, and files excluded as generated/dependency noise. Set
+`GITHUB_TOKEN` for higher GitHub API limits and future private-repository support.
