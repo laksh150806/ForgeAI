@@ -2,11 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import os
-import shutil
 import tempfile
 import time
 from pathlib import Path
-from urllib.parse import urlparse
 
 from app.schemas.planning import PatchFile
 from app.schemas.validation import (
@@ -142,7 +140,9 @@ async def _run_docker_command(
         "--cap-drop", "ALL",
         "--user", "65534:65534",
         "-e", "HOME=/tmp",
-        "-v", f"{root}:/workspace:ro",
+        "--read-only",
+        "--tmpfs", "/tmp:rw,noexec,nosuid,size=128m",
+        "-v", f"{root}:/workspace:rw",
         "-w", "/workspace",
         image,
         *command,
@@ -277,7 +277,7 @@ async def validate_patches(
 
         notes = [
             "Patch was applied only inside a temporary validation clone.",
-            "Validation containers run without network access, Linux capabilities, or repository write access.",
+            "Validation containers run without network access or Linux capabilities and can write only inside the disposable repository clone.",
         ]
         if not docker_ok:
             notes.append(
