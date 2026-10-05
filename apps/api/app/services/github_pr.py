@@ -13,7 +13,7 @@ from fastapi import HTTPException
 from app.schemas.planning import PatchFile
 from app.schemas.pull_requests import PullRequestCreateResponse
 from app.services.github_client import parse_github_repository_url
-from app.services.sandbox_validation import run_process, validate_patches
+from app.services.sandbox_validation import _run, validate_patches
 
 
 GITHUB_API = "https://api.github.com"
@@ -162,7 +162,7 @@ async def _materialize_patched_files(
         root = Path(temp_dir) / "repo"
         repo_url = f"https://github.com/{ref.full_name}.git"
 
-        clone_code, _, clone_err, _, _ = await run_process(
+        clone_code, _, clone_err, _, _ = await _run(
             ["git", "clone", "--depth", "1", "--", repo_url, str(root)],
             timeout=60,
         )
@@ -178,7 +178,7 @@ async def _materialize_patched_files(
             encoding="utf-8",
         )
 
-        apply_code, _, apply_err, _, _ = await run_process(
+        apply_code, _, apply_err, _, _ = await _run(
             ["git", "apply", "--", str(patch_path)],
             cwd=root,
             timeout=30,
