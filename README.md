@@ -101,7 +101,7 @@ Web: `http://localhost:3000`
 - [x] Sandboxed validation
 - [x] Execution traces and metrics
 - [x] Human-approved GitHub PR creation
-- [ ] Evaluation benchmark suite
+- [x] Evaluation benchmark suite
 
 ## Engineering principles
 
@@ -286,3 +286,32 @@ whose body includes task context, changed files, sandbox result, validation chec
 the approval/validation safety statement.
 
 `GITHUB_TOKEN` must have write permission to the target repository.
+
+
+## Evaluation benchmark suite
+
+ForgeAI includes a gold-labeled benchmark API for reproducible evaluation:
+
+```http
+POST /api/v1/evaluation/benchmark
+Content-Type: application/json
+```
+
+Each benchmark case specifies a repository, engineering task, expected files, optional
+expected symbols, and optionally the expected PR-gate outcome. Retrieval evaluation
+reports:
+
+- Top-1 file accuracy
+- Recall@K
+- Mean Reciprocal Rank (MRR)
+- Symbol hit accuracy
+- Average retrieval latency
+
+With `run_full_pipeline=true`, the same harness also measures:
+
+- Patch-generation rate
+- Validation pass rate
+- PR-gate accuracy
+
+The seed dataset lives at `benchmarks/forgeai.json`. Reported resume/demo numbers should
+come from actual benchmark runs; ForgeAI does not hard-code or invent performance claims.
