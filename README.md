@@ -321,6 +321,21 @@ With `run_full_pipeline=true`, the same harness also measures:
 - Validation pass rate
 - PR-gate accuracy
 
+
+### Latest measured live seed benchmark
+
+Externally verified against the deployed API on **2026-10-05**:
+
+- **66.67% Top-1 file accuracy**
+- **100% Recall@3**
+- **0.8333 MRR**
+- **100% symbol hit accuracy**
+- **99.67 ms mean task-ranking latency**
+
+These figures are from a **3-case gold-labeled seed benchmark**, not a broad SWE benchmark.
+See [docs/BENCHMARKS.md](docs/BENCHMARKS.md) for methodology, baseline comparison, and
+limitations.
+
 The seed dataset lives at `benchmarks/forgeai.json`. Reported resume/demo numbers should
 come from actual benchmark runs; ForgeAI does not hard-code or invent performance claims.
 
