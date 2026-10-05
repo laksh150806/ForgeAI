@@ -72,6 +72,26 @@ jobs:
           assert m['cases'] >= 3
           PY
 
+      - name: Check live Generate Plan
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent             -X POST             -H "Content-Type: application/json"             -d '{"repository_url":"https://github.com/laksh150806/ForgeAI","task":"Find the code responsible for GitHub repository URL validation.","generate_patch":true}'             https://forgeai-api-ok42.onrender.com/api/v1/plans/generate             | tee /tmp/plan.json
+          python - <<'PY'
+          import json
+          with open('/tmp/plan.json') as f:
+              data = json.load(f)
+          assert data["repository"] == "laksh150806/ForgeAI"
+          assert data["plan"]["target_files"]
+          assert data["patch_status"] in {
+              "generated",
+              "model_unavailable",
+              "model_output_rejected",
+              "insufficient_evidence",
+          }
+          print("Generate Plan live smoke: OK")
+          PY
+
       - name: Check live web
         run: |
           curl --fail --show-error --silent             https://forgeai-web-irot.onrender.com             | grep -q "ForgeAI"
