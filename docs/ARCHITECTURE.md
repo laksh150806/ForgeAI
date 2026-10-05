@@ -97,3 +97,13 @@ Recall@K, Mean Reciprocal Rank, symbol accuracy, and retrieval latency. Optional
 workflow evaluation additionally records whether patches are generated, sandbox
 validation passes, and the PR gate matches an expected outcome. Benchmark scoring logic
 is deterministic and unit-tested independently of model credentials.
+
+
+### Production runtime and persistence
+
+Production configuration is environment-driven. CORS origins are explicit, liveness and
+readiness are separate, and readiness verifies Postgres when a database is configured.
+Execution traces can be persisted to a `forgeai_runs` JSONB-backed table. Persistence is
+best-effort for workflow execution: a database write failure never rewrites a successful
+agent result, while the readiness endpoint still surfaces persistent-infrastructure
+failures to operators.
