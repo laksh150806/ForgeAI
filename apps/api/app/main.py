@@ -3,11 +3,12 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes.code_intelligence import router as code_intelligence_router
 from app.routes.investigations import router as investigations_router
+from app.routes.planning import router as planning_router
 from app.routes.repositories import router as repositories_router
 
 app = FastAPI(
     title="ForgeAI API",
-    version="0.4.0",
+    version="0.5.0",
     description="Autonomous software engineering and incident intelligence platform.",
 )
 
@@ -22,6 +23,7 @@ app.add_middleware(
 app.include_router(repositories_router)
 app.include_router(code_intelligence_router)
 app.include_router(investigations_router)
+app.include_router(planning_router)
 
 
 @app.get("/health")
@@ -33,6 +35,6 @@ def health() -> dict[str, str]:
 def status() -> dict[str, str]:
     return {
         "product": "ForgeAI",
-        "phase": "hybrid-investigation",
-        "capability": "hybrid task retrieval and structured investigation",
+        "phase": "planning-patch-generation",
+        "capability": "evidence-backed planning and reviewable patch proposals",
     }
