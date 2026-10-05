@@ -34,6 +34,34 @@ type CodeSearch = {
   results: SearchResult[];
 };
 
+type Patch = {
+  path: string;
+  rationale: string;
+  unified_diff: string;
+};
+
+type Plan = {
+  repository: string;
+  task: string;
+  patch_status: string;
+  approval_required: boolean;
+  plan: {
+    summary: string;
+    confidence: number;
+    target_files: string[];
+    steps: {
+      order: number;
+      title: string;
+      description: string;
+      files: string[];
+      verification: string;
+    }[];
+    risks: string[];
+    validation_commands: string[];
+  };
+  patches: Patch[];
+};
+
 type Investigation = {
   repository: string;
   task: string;
@@ -61,8 +89,9 @@ export default function Home() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [search, setSearch] = useState<CodeSearch | null>(null);
   const [investigation, setInvestigation] = useState<Investigation | null>(null);
+  const [plan, setPlan] = useState<Plan | null>(null);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -102,6 +131,26 @@ export default function Home() {
       setInvestigation(payload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Investigation failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function generatePlan() {
+    setLoading("plan");
+    setError("");
+    setPlan(null);
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/plans/generate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ repository_url: repositoryUrl, task, generate_patch: true }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Planning failed.");
+      setPlan(payload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Planning failed.");
     } finally {
       setLoading(null);
     }
@@ -159,6 +208,14 @@ export default function Home() {
             >
               {loading === "investigate" ? "Investigating…" : "Run investigation"}
             </button>
+            <button
+              className="secondaryButton"
+              disabled={loading !== null}
+              type="button"
+              onClick={generatePlan}
+            >
+              {loading === "plan" ? "Planning…" : "Generate plan + patch"}
+            </button>
           </div>
         </form>
 
@@ -209,6 +266,68 @@ export default function Home() {
               </ol>
             </div>
           </div>
+        </section>
+      )}
+
+      {plan && (
+        <section className="panel planPanel">
+          <div className="analysisHeader">
+            <div>
+              <span className="label">ENGINEERING PLAN</span>
+              <h2>{plan.plan.summary}</h2>
+              <p>
+                Confidence {Math.round(plan.plan.confidence * 100)}% · Patch status {plan.patch_status}
+              </p>
+            </div>
+            {plan.approval_required && <span className="approvalBadge">Approval required</span>}
+          </div>
+
+          <div className="planGrid">
+            <div>
+              <h3>Implementation steps</h3>
+              <div className="planSteps">
+                {plan.plan.steps.map((step) => (
+                  <article key={step.order}>
+                    <span>0{step.order}</span>
+                    <strong>{step.title}</strong>
+                    <p>{step.description}</p>
+                    <small>{step.verification}</small>
+                  </article>
+                ))}
+              </div>
+            </div>
+
+            <div>
+              <h3>Risk controls</h3>
+              <ul>
+                {plan.plan.risks.map((risk) => <li key={risk}>{risk}</li>)}
+              </ul>
+              <h3>Validation commands</h3>
+              <div className="commandList">
+                {plan.plan.validation_commands.map((command) => <code key={command}>{command}</code>)}
+              </div>
+            </div>
+          </div>
+
+          {plan.patches.length > 0 ? (
+            <div className="patches">
+              <h3>Proposed patch</h3>
+              {plan.patches.map((patch) => (
+                <article className="patchCard" key={patch.path}>
+                  <div className="patchHeader">
+                    <strong>{patch.path}</strong>
+                    <span>Preview only</span>
+                  </div>
+                  <p>{patch.rationale}</p>
+                  <pre>{patch.unified_diff}</pre>
+                </article>
+              ))}
+            </div>
+          ) : (
+            <p className="muted">
+              No patch was generated. The engineering plan is still available for review.
+            </p>
+          )}
         </section>
       )}
 
