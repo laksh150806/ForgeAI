@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from collections import Counter
 from pathlib import PurePosixPath
 
@@ -9,6 +10,7 @@ from app.schemas.repository import (
     RepositoryFile,
     RepositorySummary,
 )
+from app.services.git_repository import public_repository_checkout
 from app.services.github_client import GitHubClient, parse_github_repository_url
 
 
@@ -169,7 +171,51 @@ def _language_stats(files: list[RepositoryFile]) -> list[LanguageStat]:
     ]
 
 
+async def _analyze_public_checkout(repository_url: str) -> RepositoryAnalysisResponse:
+    async with public_repository_checkout(repository_url) as (ref, root, default_branch):
+        files: list[RepositoryFile] = []
+        for item in root.rglob("*"):
+            if not item.is_file() or ".git" in item.parts:
+                continue
+            relative = item.relative_to(root).as_posix()
+            try:
+                size = item.stat().st_size
+            except OSError:
+                size = None
+            files.append(classify_path(relative, size))
+
+    source_files = sum(
+        1 for file in files if file.kind == "source" and not file.ignored
+    )
+    ignored_files = sum(1 for file in files if file.ignored)
+    important_files = [
+        file.path
+        for file in files
+        if file.kind == "important" and not file.ignored
+    ][:30]
+
+    summary = RepositorySummary(
+        owner=ref.owner,
+        name=ref.name,
+        full_name=ref.full_name,
+        default_branch=default_branch,
+        visibility="public",
+        description=None,
+        stars=0,
+        forks=0,
+        total_files=len(files),
+        source_files=source_files,
+        ignored_files=ignored_files,
+        languages=_language_stats(files),
+        important_files=important_files,
+    )
+    return RepositoryAnalysisResponse(repository=summary, files=files)
+
+
 async def analyze_repository(repository_url: str) -> RepositoryAnalysisResponse:
+    if not os.getenv("GITHUB_TOKEN"):
+        return await _analyze_public_checkout(repository_url)
+
     ref = parse_github_repository_url(repository_url)
     client = GitHubClient()
 
@@ -181,11 +227,6 @@ async def analyze_repository(repository_url: str) -> RepositoryAnalysisResponse:
         tree = await client.tree(ref, tree_sha)
     finally:
         await client.close()
-
-    if tree.get("truncated"):
-        # Keep the result useful while making the limitation explicit through counts.
-        # A paginated contents crawler can be added for very large repositories later.
-        pass
 
     blobs = [item for item in tree.get("tree", []) if item.get("type") == "blob"]
     files = [
