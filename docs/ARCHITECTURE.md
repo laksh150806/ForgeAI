@@ -19,11 +19,15 @@ FastAPI service responsible for authentication boundaries, repository ingestion,
 task orchestration, retrieval, model/tool adapters, validation jobs, and persistence.
 
 ### Code intelligence
-Planned subsystem using Tree-sitter/AST parsing plus semantic and lexical retrieval.
+Source-aware retrieval subsystem using AST/symbol extraction, lexical ranking, and
+optional embedding-based semantic reranking. Retrieval degrades safely to lexical mode
+when no embedding provider is configured.
 
 ### Agent runtime
-Planned state-machine workflow with explicit stages instead of a single open-ended
-LLM loop. Each stage must record inputs, outputs, tool calls, latency, and failures.
+The first investigation stage is evidence-driven: it consumes ranked repository evidence,
+produces a bounded-confidence hypothesis, and recommends verification steps. Later stages
+will extend this into planning, patching, validation, and review while preserving explicit
+state transitions and observable inputs/outputs.
 
 ### Validation sandbox
 Planned isolated environment for dependency installation, test execution, linting,
