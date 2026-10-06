@@ -92,6 +92,29 @@ jobs:
           print("Generate Plan live smoke: OK")
           PY
 
+      - name: Check live incident correlation
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"repository_url":"https://github.com/laksh150806/ForgeAI","incident":"Production incident correlation fails while inspecting recent changes.","evidence":{"error_message":"Failure in apps/api/app/services/incident_correlation.py while correlating a deploy."},"lookback_commits":20,"code_limit":6}' \
+            https://forgeai-api-ok42.onrender.com/api/v1/incidents/correlate \
+            | tee /tmp/incident.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/incident.json') as f:
+              data = json.load(f)
+          assert data["repository"] == "laksh150806/ForgeAI"
+          assert data["correlation_mode"] == "git-history+runtime-evidence+code-retrieval"
+          assert data["candidates"]
+          assert data["investigation"]["evidence"]
+          assert data["investigation"]["hypothesis"]["summary"]
+          print("Incident correlation live smoke: OK")
+          PY
+
       - name: Check live trace history
         shell: bash
         run: |
