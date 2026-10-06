@@ -333,6 +333,22 @@ def _bounded(
     return seen - start_ids, paths
 
 
+def _prioritize_runtime_nodes(
+    items: list[ImpactNode],
+    runtime_ids: set[str],
+    limit: int,
+) -> list[ImpactNode]:
+    return sorted(
+        items,
+        key=lambda node: (
+            0 if node.id in runtime_ids else 1,
+            node.path,
+            node.line_start,
+            node.symbol,
+        ),
+    )[:limit]
+
+
 def _select_commit(history: list[GitCommitSnapshot], requested_sha: str | None) -> GitCommitSnapshot:
     if not history:
         raise HTTPException(status_code=404, detail="No Git commit history was available for impact analysis.")
@@ -451,19 +467,13 @@ async def analyze_impact(payload: ImpactAnalysisRequest) -> ImpactAnalysisRespon
         explanations.append("No explicit stack/runtime symbol match was found; blast radius is based on changed symbols and static graph reachability.")
 
     sort_key = lambda node: (node.path, node.line_start, node.symbol)
-    changed_sort_key = lambda node: (
-        0 if node.id in runtime_ids else 1,
-        node.path,
-        node.line_start,
-        node.symbol,
-    )
     return ImpactAnalysisResponse(
         repository=ref.full_name,
         commit_sha=commit.sha,
         graph_mode="static-symbol-graph+git-diff+runtime-match",
         graph_nodes=len(nodes),
         graph_edges=len(edges),
-        changed_symbols=sorted(changed, key=changed_sort_key)[:30],
+        changed_symbols=_prioritize_runtime_nodes(changed, runtime_ids, 30),
         runtime_matches=sorted(runtime_matches, key=sort_key)[:30],
         callers=sorted(callers, key=sort_key)[:40],
         downstream=sorted(downstream, key=sort_key)[:40],
