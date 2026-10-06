@@ -451,13 +451,19 @@ async def analyze_impact(payload: ImpactAnalysisRequest) -> ImpactAnalysisRespon
         explanations.append("No explicit stack/runtime symbol match was found; blast radius is based on changed symbols and static graph reachability.")
 
     sort_key = lambda node: (node.path, node.line_start, node.symbol)
+    changed_sort_key = lambda node: (
+        0 if node.id in runtime_ids else 1,
+        node.path,
+        node.line_start,
+        node.symbol,
+    )
     return ImpactAnalysisResponse(
         repository=ref.full_name,
         commit_sha=commit.sha,
         graph_mode="static-symbol-graph+git-diff+runtime-match",
         graph_nodes=len(nodes),
         graph_edges=len(edges),
-        changed_symbols=sorted(changed, key=sort_key)[:30],
+        changed_symbols=sorted(changed, key=changed_sort_key)[:30],
         runtime_matches=sorted(runtime_matches, key=sort_key)[:30],
         callers=sorted(callers, key=sort_key)[:40],
         downstream=sorted(downstream, key=sort_key)[:40],
