@@ -92,6 +92,42 @@ jobs:
           print("Generate Plan live smoke: OK")
           PY
 
+
+      - name: Check live blast-radius analysis
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"repository_url":"https://github.com/laksh150806/ForgeAI","commit_sha":"3dd89c8b4ebebf24a70aef672f8c13846853eab8","runtime_text":"Production traceback points to apps/api/app/services/impact_analysis.py in analyze_impact while calculating blast radius.","lookback_commits":40,"max_depth":3}' \
+            https://forgeai-api-ok42.onrender.com/api/v1/impact/analyze \
+            | tee /tmp/impact.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/impact.json') as f:
+              data = json.load(f)
+          assert data["repository"] == "laksh150806/ForgeAI"
+          assert data["commit_sha"].startswith("3dd89c8b")
+          assert data["graph_mode"] == "static-symbol-graph+git-diff+runtime-match"
+          assert data["graph_nodes"] > 0
+          assert data["graph_edges"] > 0
+          assert data["changed_symbols"]
+          assert data["runtime_matches"]
+          assert any(node["symbol"] == "analyze_impact" for node in data["runtime_matches"])
+          assert data["blast_radius_score"] > 0
+          assert data["explanation"]
+          print(
+              "Blast-radius live smoke:",
+              data["graph_nodes"],
+              "nodes,",
+              data["graph_edges"],
+              "edges, score",
+              data["blast_radius_score"],
+          )
+          PY
+
       - name: Check live incident correlation
         shell: bash
         run: |
@@ -108,7 +144,8 @@ jobs:
           with open('/tmp/incident.json') as f:
               data = json.load(f)
           assert data["repository"] == "laksh150806/ForgeAI"
-          assert data["correlation_mode"] == "git-history+runtime-evidence+code-retrieval"
+          assert data["correlation_mode"] == "git-history+runtime-evidence+code-retrieval+blast-radius"
+          assert "impact" in data
           assert data["candidates"]
           assert data["investigation"]["evidence"]
           assert data["investigation"]["hypothesis"]["summary"]
