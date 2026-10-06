@@ -127,7 +127,7 @@ def _parse_python(path: str, source: str) -> ParsedFile:
 
 
 def _js_symbol_nodes(path: str, source: str) -> list[ImpactNode]:
-    raw = extract_js_symbols(source, "TypeScript" if path.endswith((".ts", ".tsx")) else "JavaScript")
+    raw = extract_js_symbols(source)
     lines = source.splitlines()
     nodes = [_module_node(path)]
     for index, symbol in enumerate(raw):
