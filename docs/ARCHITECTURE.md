@@ -140,3 +140,21 @@ Timeline reconstruction is causal rather than purely chronological:
 
 This creates the runtime-to-code bridge needed for production debugging while keeping each
 signal explicit and auditable.
+
+
+### Runtime provider abstraction
+
+Provider integrations terminate in a shared runtime-provider ingestion boundary. Each adapter
+is responsible only for authentication, provider API calls, and normalization into
+`TelemetryEvent`. The shared layer then handles deduplication, persistence, bounded timeline
+reconstruction, and runtime-to-code correlation.
+
+```text
+Render API ─┐
+            ├─> TelemetryEvent[] ─> shared provider pipeline ─> Supabase
+Vercel API ─┘                                              └─> timeline/correlation
+Generic POST ────────────────────────────────────────────────────────────────┘
+```
+
+This prevents provider-specific behavior from leaking into root-cause reasoning and makes new
+adapters incremental rather than architectural rewrites.
