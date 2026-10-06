@@ -199,10 +199,7 @@ async def sync_render(payload: RenderSyncRequest) -> RenderSyncResponse:
     async with httpx.AsyncClient(base_url=RENDER_API, headers=headers, timeout=timeout) as client:
         deploy_response = await client.get(
             f"/services/{service_id}/deploys",
-            params={
-                "createdAfter": start.isoformat(),
-                "limit": payload.deploy_limit,
-            },
+            params={"limit": payload.deploy_limit},
         )
         logs_response = await client.get(
             "/logs",
@@ -233,7 +230,11 @@ async def sync_render(payload: RenderSyncRequest) -> RenderSyncResponse:
                 detail=f"Render API returned {response.status_code} while fetching {label}.",
             )
 
-    deploy_events = normalize_render_deploys(deploy_response.json(), service_id)
+    deploy_events = [
+        event
+        for event in normalize_render_deploys(deploy_response.json(), service_id)
+        if event.observed_at >= start
+    ]
     log_events = normalize_render_logs(logs_response.json(), service_id)
     events_by_id = {str(event.event_id): event for event in [*deploy_events, *log_events]}
     events = sorted(events_by_id.values(), key=lambda event: event.observed_at)
