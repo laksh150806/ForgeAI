@@ -1264,3 +1264,99 @@ button {
     flex-direction: column;
   }
 }
+
+
+.telemetryPanel {
+  margin-bottom: 24px;
+  border-color: #34516a;
+}
+
+.telemetryControls {
+  display: flex;
+  gap: 12px;
+  align-items: end;
+  margin-top: 20px;
+}
+
+.telemetryControls label {
+  display: grid;
+  gap: 7px;
+  flex: 1;
+}
+
+.telemetryControls label > span,
+.timelineSummary span {
+  color: #8498af;
+  font-size: .76rem;
+  font-weight: 700;
+}
+
+.telemetryControls input {
+  width: 100%;
+  border: 1px solid #26384d;
+  background: #08111b;
+  color: #e7eef7;
+  border-radius: 12px;
+  padding: 13px 14px;
+  font: inherit;
+}
+
+.telemetryResult {
+  display: grid;
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.timelineSummary {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.timelineSummary article,
+.telemetryEventList article,
+.timelineCorrelation {
+  border: 1px solid #203247;
+  background: #09121c;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.timelineSummary strong {
+  display: block;
+  margin-top: 8px;
+  overflow-wrap: anywhere;
+}
+
+.telemetryEventList {
+  display: grid;
+  gap: 10px;
+}
+
+.telemetryEventList p,
+.timelineCorrelation p {
+  color: #93a6bc;
+  line-height: 1.55;
+  margin-bottom: 0;
+}
+
+.telemetryEventList code {
+  display: inline-block;
+  margin-top: 8px;
+  color: #bce6ff;
+}
+
+@media (max-width: 760px) {
+  .telemetryControls {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .telemetryControls button {
+    width: 100%;
+  }
+
+  .timelineSummary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
