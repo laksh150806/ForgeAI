@@ -8,6 +8,12 @@ class BenchmarkCase(BaseModel):
     expected_files: list[str] = Field(..., min_length=1)
     expected_symbols: list[str] = []
     expected_gate_open: bool | None = None
+    impact_commit_sha: str | None = Field(default=None, min_length=4, max_length=64)
+    impact_runtime_text: str | None = Field(default=None, max_length=16000)
+    impact_lookback_commits: int = Field(default=80, ge=2, le=100)
+    expected_changed_symbols: list[str] = []
+    expected_runtime_symbols: list[str] = []
+    expected_affected_entrypoints: list[str] = []
 
 
 class BenchmarkRequest(BaseModel):
@@ -30,6 +36,11 @@ class BenchmarkCaseResult(BaseModel):
     validation_passed: bool | None = None
     pr_gate_open: bool | None = None
     gate_correct: bool | None = None
+    impact_changed_symbol_hit: bool | None = None
+    impact_runtime_symbol_hit: bool | None = None
+    impact_entrypoint_hit: bool | None = None
+    blast_radius_score: float | None = None
+    impact_confidence: float | None = None
 
 
 class BenchmarkMetrics(BaseModel):
@@ -42,6 +53,11 @@ class BenchmarkMetrics(BaseModel):
     patch_generation_rate: float | None = None
     validation_pass_rate: float | None = None
     pr_gate_accuracy: float | None = None
+    impact_cases: int = 0
+    impact_changed_symbol_accuracy: float | None = None
+    impact_runtime_symbol_accuracy: float | None = None
+    impact_entrypoint_accuracy: float | None = None
+    average_blast_radius_score: float | None = None
 
 
 class BenchmarkResponse(BaseModel):

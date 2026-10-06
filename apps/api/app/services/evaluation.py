@@ -15,6 +15,8 @@ from app.services.code_intelligence import (
     search_repository_code,
 )
 from app.services.observability import execute_workflow
+from app.schemas.impact import ImpactAnalysisRequest
+from app.services.impact_analysis import analyze_impact
 
 
 def retrieval_scores(
@@ -64,6 +66,22 @@ def aggregate_metrics(results: list[BenchmarkCaseResult], top_k: int) -> Benchma
     patch_values = [item.patch_generated for item in results if item.patch_generated is not None]
     validation_values = [item.validation_passed for item in results if item.validation_passed is not None]
     gate_values = [item.gate_correct for item in results if item.gate_correct is not None]
+    impact_results = [item for item in results if item.blast_radius_score is not None]
+    changed_symbol_values = [
+        item.impact_changed_symbol_hit
+        for item in impact_results
+        if item.impact_changed_symbol_hit is not None
+    ]
+    runtime_symbol_values = [
+        item.impact_runtime_symbol_hit
+        for item in impact_results
+        if item.impact_runtime_symbol_hit is not None
+    ]
+    entrypoint_values = [
+        item.impact_entrypoint_hit
+        for item in impact_results
+        if item.impact_entrypoint_hit is not None
+    ]
 
     return BenchmarkMetrics(
         cases=len(results),
@@ -78,6 +96,27 @@ def aggregate_metrics(results: list[BenchmarkCaseResult], top_k: int) -> Benchma
         patch_generation_rate=_mean([1.0 if value else 0.0 for value in patch_values]) if patch_values else None,
         validation_pass_rate=_mean([1.0 if value else 0.0 for value in validation_values]) if validation_values else None,
         pr_gate_accuracy=_mean([1.0 if value else 0.0 for value in gate_values]) if gate_values else None,
+        impact_cases=len(impact_results),
+        impact_changed_symbol_accuracy=(
+            _mean([1.0 if value else 0.0 for value in changed_symbol_values])
+            if changed_symbol_values else None
+        ),
+        impact_runtime_symbol_accuracy=(
+            _mean([1.0 if value else 0.0 for value in runtime_symbol_values])
+            if runtime_symbol_values else None
+        ),
+        impact_entrypoint_accuracy=(
+            _mean([1.0 if value else 0.0 for value in entrypoint_values])
+            if entrypoint_values else None
+        ),
+        average_blast_radius_score=(
+            round(
+                sum(item.blast_radius_score or 0.0 for item in impact_results)
+                / len(impact_results),
+                2,
+            )
+            if impact_results else None
+        ),
     )
 
 
@@ -119,6 +158,39 @@ async def evaluate_case(
     validation_passed = None
     pr_gate_open = None
     gate_correct = None
+    impact_changed_symbol_hit = None
+    impact_runtime_symbol_hit = None
+    impact_entrypoint_hit = None
+    blast_radius_score = None
+    impact_confidence = None
+
+    if case.impact_commit_sha and case.impact_runtime_text:
+        impact = await analyze_impact(
+            ImpactAnalysisRequest(
+                repository_url=case.repository_url,
+                commit_sha=case.impact_commit_sha,
+                runtime_text=case.impact_runtime_text,
+                lookback_commits=case.impact_lookback_commits,
+                max_depth=3,
+            )
+        )
+        changed_names = [node.symbol for node in impact.changed_symbols]
+        runtime_names = [node.symbol for node in impact.runtime_matches]
+        entrypoint_names = [node.symbol for node in impact.affected_entrypoints]
+        impact_changed_symbol_hit = symbol_match(
+            changed_names,
+            case.expected_changed_symbols,
+        )
+        impact_runtime_symbol_hit = symbol_match(
+            runtime_names,
+            case.expected_runtime_symbols,
+        )
+        impact_entrypoint_hit = symbol_match(
+            entrypoint_names,
+            case.expected_affected_entrypoints,
+        )
+        blast_radius_score = impact.blast_radius_score
+        impact_confidence = impact.confidence
 
     if run_full_pipeline:
         workflow = await execute_workflow(
@@ -147,6 +219,11 @@ async def evaluate_case(
         validation_passed=validation_passed,
         pr_gate_open=pr_gate_open,
         gate_correct=gate_correct,
+        impact_changed_symbol_hit=impact_changed_symbol_hit,
+        impact_runtime_symbol_hit=impact_runtime_symbol_hit,
+        impact_entrypoint_hit=impact_entrypoint_hit,
+        blast_radius_score=blast_radius_score,
+        impact_confidence=impact_confidence,
     )
 
 
