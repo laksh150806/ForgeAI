@@ -241,6 +241,23 @@ jobs:
           )
           PY
 
+      - name: Check Vercel adapter status
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            https://forgeai-api-ok42.onrender.com/api/v1/integrations/vercel/status \
+            | tee /tmp/vercel-status.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/vercel-status.json') as f:
+              data = json.load(f)
+          assert "configured" in data
+          assert data["runtime_logs_mode"] == "generic-telemetry-or-log-drain"
+          print("Vercel adapter status endpoint: OK")
+          PY
+
       - name: Check live trace history
         shell: bash
         run: |
