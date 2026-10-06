@@ -24,7 +24,7 @@ class ImpactAnalysisRequest(BaseModel):
     commit_sha: str | None = Field(default=None, min_length=4, max_length=64)
     runtime_text: str = Field(default="", max_length=16000)
     stack_trace: str | None = Field(default=None, max_length=16000)
-    lookback_commits: int = Field(default=20, ge=2, le=40)
+    lookback_commits: int = Field(default=20, ge=2, le=100)
     max_depth: int = Field(default=3, ge=1, le=5)
 
 
