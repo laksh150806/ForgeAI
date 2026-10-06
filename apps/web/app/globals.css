@@ -1360,3 +1360,11 @@ button {
     grid-template-columns: minmax(0, 1fr);
   }
 }
+
+
+.adapterStatus {
+  margin: 10px 0 0;
+  color: #8195aa;
+  font-size: .78rem;
+  overflow-wrap: anywhere;
+}
