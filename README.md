@@ -1,8 +1,8 @@
 # ForgeAI
 
-**Autonomous AI Software Engineering & Incident Intelligence Platform**
+**Autonomous Production Debugging & Remediation Engine**
 
-ForgeAI is a production-oriented AI engineering platform designed to understand software repositories, investigate engineering tasks and incidents, propose code changes, validate them, and produce an auditable engineering report.
+ForgeAI is a production-oriented debugging and remediation engine that correlates runtime failures with recent code changes, localizes likely regressions, builds evidence-backed fix plans, validates proposed patches, and preserves an auditable incident-to-fix trail.
 
 ## Live deployment
 
@@ -15,11 +15,13 @@ ForgeAI is a production-oriented AI engineering platform designed to understand 
 ForgeAI is not a generic coding chatbot. The target workflow is:
 
 ```
-Repository
+Production Failure / Runtime Evidence
    ↓
-Code Intelligence
+Deploy + Commit Correlation
    ↓
-Task / Incident Investigation
+Repository / Code Intelligence
+   ↓
+Root-cause Investigation
    ↓
 Evidence-backed Engineering Plan
    ↓
@@ -109,7 +111,9 @@ Web: `http://localhost:3000`
 - [x] Human-approved GitHub PR creation
 - [x] Evaluation benchmark suite
 - [x] Production deployment hardening
-- [x] Persistent execution traces (optional Postgres)
+- [x] Persistent execution traces (Supabase/Postgres)
+- [x] Production incident → recent commit correlation
+- [x] Runtime evidence → code-level hypothesis cross-check
 
 ## Engineering principles
 
@@ -357,3 +361,36 @@ Production hardening includes:
 When `DATABASE_URL` is absent, ForgeAI remains functional with a bounded in-memory trace history.
 For zero-cost durable traces, use the Supabase Free shared session pooler as documented in
 [docs/DEPLOYMENT.md](docs/DEPLOYMENT.md).
+
+
+## Production incident correlation
+
+ForgeAI's differentiating workflow begins with a production failure rather than a pull request.
+
+```http
+POST /api/v1/incidents/correlate
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/laksh150806/ForgeAI",
+  "incident": "Production requests started returning 500 after the latest deploy.",
+  "evidence": {
+    "error_message": "PaymentTimeout in apps/api/app/services/payments.py",
+    "stack_trace": null,
+    "logs": [],
+    "deploy_sha": "optional-commit-sha"
+  },
+  "lookback_commits": 10,
+  "code_limit": 6
+}
+```
+
+The correlator shallow-clones bounded Git history, inspects recent commit subjects, changed
+files, and diffs, scores them against runtime evidence, boosts an explicitly supplied deploy
+SHA, then cross-checks changed files against ForgeAI's code retrieval results. The response
+contains ranked suspect commits and a code-level investigation hypothesis. This is the first
+step toward the full target flow:
+
+```text
+runtime failure → suspect deploy → changed symbols → root cause → patch → validation → approval → PR
+```
