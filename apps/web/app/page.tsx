@@ -187,6 +187,37 @@ type IncidentCorrelation = {
   investigation: Investigation;
 };
 
+type TelemetryTimeline = {
+  repository: string;
+  service: string | null;
+  window_start: string;
+  window_end: string;
+  first_failure_at: string | null;
+  nearest_deploy: {
+    event_id: string;
+    observed_at: string;
+    source: string;
+    event_type: string;
+    severity: string;
+    service: string | null;
+    message: string;
+    deploy_sha: string | null;
+    metadata: Record<string, unknown>;
+  } | null;
+  events: {
+    event_id: string;
+    observed_at: string;
+    source: string;
+    event_type: string;
+    severity: string;
+    service: string | null;
+    message: string;
+    deploy_sha: string | null;
+    metadata: Record<string, unknown>;
+  }[];
+  correlation: IncidentCorrelation | null;
+};
+
 const stages = [
   "Repository connected",
   "Codebase indexed",
@@ -205,6 +236,8 @@ export default function Home() {
   const [runtimeEvidence, setRuntimeEvidence] = useState("");
   const [deploySha, setDeploySha] = useState("");
   const [incidentResult, setIncidentResult] = useState<IncidentCorrelation | null>(null);
+  const [telemetryService, setTelemetryService] = useState("forgeai-api");
+  const [telemetryTimeline, setTelemetryTimeline] = useState<TelemetryTimeline | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
@@ -213,7 +246,7 @@ export default function Home() {
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "telemetry" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -310,6 +343,80 @@ export default function Home() {
       setIncidentResult(payload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Incident correlation failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function ingestAndReconstructDemoTelemetry() {
+    setLoading("telemetry");
+    setError("");
+    setTelemetryTimeline(null);
+
+    try {
+      const now = Date.now();
+      const events = [
+        {
+          observed_at: new Date(now - 5 * 60_000).toISOString(),
+          source: "demo",
+          event_type: "deploy",
+          severity: "info",
+          service: telemetryService,
+          message: "Deployment completed",
+          deploy_sha: deploySha || null,
+          metadata: { environment: "production" },
+        },
+        {
+          observed_at: new Date(now - 2 * 60_000).toISOString(),
+          source: "demo",
+          event_type: "log",
+          severity: "warning",
+          service: telemetryService,
+          message: runtimeEvidence || "Latency and error rate increased after deployment.",
+          deploy_sha: null,
+          metadata: {},
+        },
+        {
+          observed_at: new Date(now - 60_000).toISOString(),
+          source: "demo",
+          event_type: "error",
+          severity: "error",
+          service: telemetryService,
+          message: runtimeEvidence || "Production requests started returning 500.",
+          deploy_sha: null,
+          metadata: {},
+        },
+      ];
+
+      const ingestResponse = await fetch(`${apiUrl}/api/v1/telemetry/events`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ events }),
+      });
+      const ingestPayload = await ingestResponse.json();
+      if (!ingestResponse.ok) {
+        throw new Error(ingestPayload.detail ?? "Telemetry ingestion failed.");
+      }
+
+      const timelineResponse = await fetch(`${apiUrl}/api/v1/telemetry/timeline`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          service: telemetryService,
+          lookback_minutes: 30,
+          max_events: 100,
+          lookback_commits: 20,
+          code_limit: 6,
+        }),
+      });
+      const timelinePayload = await timelineResponse.json();
+      if (!timelineResponse.ok) {
+        throw new Error(timelinePayload.detail ?? "Timeline reconstruction failed.");
+      }
+      setTelemetryTimeline(timelinePayload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Telemetry timeline failed.");
     } finally {
       setLoading(null);
     }
@@ -670,6 +777,75 @@ export default function Home() {
                 </article>
               ))}
             </div>
+          </div>
+        )}
+      </section>
+
+      <section className="panel telemetryPanel">
+        <div className="analysisHeader">
+          <div>
+            <span className="label">TELEMETRY TIMELINE</span>
+            <h2>Reconstruct what happened around the failure.</h2>
+            <p>
+              ForgeAI persists deploy/error events, finds the first failure, locates the nearest
+              preceding deploy, and sends that evidence into regression correlation.
+            </p>
+          </div>
+          <span className="branch">events → timeline → cause</span>
+        </div>
+
+        <div className="telemetryControls">
+          <label>
+            <span>Service</span>
+            <input value={telemetryService} onChange={(e) => setTelemetryService(e.target.value)} />
+          </label>
+          <button disabled={loading !== null} type="button" onClick={ingestAndReconstructDemoTelemetry}>
+            {loading === "telemetry" ? "Reconstructing timeline…" : "Ingest demo telemetry + reconstruct"}
+          </button>
+        </div>
+
+        {telemetryTimeline && (
+          <div className="telemetryResult">
+            <div className="timelineSummary">
+              <article>
+                <span>First failure</span>
+                <strong>{telemetryTimeline.first_failure_at ? new Date(telemetryTimeline.first_failure_at).toLocaleTimeString() : "None"}</strong>
+              </article>
+              <article>
+                <span>Nearest deploy</span>
+                <strong>{telemetryTimeline.nearest_deploy?.deploy_sha ?? "No SHA"}</strong>
+              </article>
+              <article>
+                <span>Events</span>
+                <strong>{telemetryTimeline.events.length}</strong>
+              </article>
+            </div>
+
+            <div className="telemetryEventList">
+              {telemetryTimeline.events.map((event) => (
+                <article key={event.event_id}>
+                  <div className="commandHeader">
+                    <strong>{event.event_type} · {event.severity}</strong>
+                    <span>{new Date(event.observed_at).toLocaleTimeString()}</span>
+                  </div>
+                  <p>{event.message}</p>
+                  {event.deploy_sha && <code>{event.deploy_sha}</code>}
+                </article>
+              ))}
+            </div>
+
+            {telemetryTimeline.correlation?.suspected_commit && (
+              <div className="timelineCorrelation">
+                <span className="label">CORRELATED REGRESSION</span>
+                <h3>
+                  {telemetryTimeline.correlation.suspected_commit.short_sha} ·
+                  {" "}{telemetryTimeline.correlation.suspected_commit.subject}
+                </h3>
+                <p>
+                  Confidence {Math.round(telemetryTimeline.correlation.suspected_commit.confidence * 100)}%
+                </p>
+              </div>
+            )}
           </div>
         )}
       </section>
