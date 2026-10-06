@@ -218,6 +218,23 @@ type TelemetryTimeline = {
   correlation: IncidentCorrelation | null;
 };
 
+type RenderAdapterStatus = {
+  configured: boolean;
+  service_id: string | null;
+  workspace_id: string | null;
+  api_key_configured: boolean;
+};
+
+type RenderSyncResult = {
+  service_id: string;
+  workspace_id: string;
+  deploy_events: number;
+  log_events: number;
+  accepted_events: number;
+  storage: string;
+  timeline: TelemetryTimeline | null;
+};
+
 const stages = [
   "Repository connected",
   "Codebase indexed",
@@ -238,6 +255,8 @@ export default function Home() {
   const [incidentResult, setIncidentResult] = useState<IncidentCorrelation | null>(null);
   const [telemetryService, setTelemetryService] = useState("forgeai-api");
   const [telemetryTimeline, setTelemetryTimeline] = useState<TelemetryTimeline | null>(null);
+  const [renderStatus, setRenderStatus] = useState<RenderAdapterStatus | null>(null);
+  const [renderSync, setRenderSync] = useState<RenderSyncResult | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
@@ -246,7 +265,7 @@ export default function Home() {
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "telemetry" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "telemetry" | "render" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -275,6 +294,10 @@ export default function Home() {
 
   useEffect(() => {
     loadRecentRuns();
+    fetch(`${apiUrl}/api/v1/integrations/render/status`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => payload && setRenderStatus(payload))
+      .catch(() => {});
   }, []);
 
   async function analyzeRepository(event: FormEvent) {
@@ -417,6 +440,34 @@ export default function Home() {
       setTelemetryTimeline(timelinePayload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Telemetry timeline failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function syncRenderTelemetry() {
+    setLoading("render");
+    setError("");
+    setRenderSync(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/integrations/render/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          lookback_minutes: 60,
+          log_limit: 100,
+          deploy_limit: 20,
+          reconstruct_timeline: true,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Render telemetry sync failed.");
+      setRenderSync(payload);
+      if (payload.timeline) setTelemetryTimeline(payload.timeline);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Render telemetry sync failed.");
     } finally {
       setLoading(null);
     }
@@ -802,7 +853,21 @@ export default function Home() {
           <button disabled={loading !== null} type="button" onClick={ingestAndReconstructDemoTelemetry}>
             {loading === "telemetry" ? "Reconstructing timeline…" : "Ingest demo telemetry + reconstruct"}
           </button>
+          <button
+            className="secondaryButton"
+            disabled={loading !== null || renderStatus?.configured === false}
+            type="button"
+            onClick={syncRenderTelemetry}
+          >
+            {loading === "render" ? "Syncing Render…" : "Sync Render automatically"}
+          </button>
         </div>
+
+        <p className="adapterStatus">
+          Render adapter: {renderStatus?.configured ? "configured" : "not configured"}
+          {renderStatus?.service_id ? ` · ${renderStatus.service_id}` : ""}
+          {renderSync ? ` · ${renderSync.accepted_events} events synced to ${renderSync.storage}` : ""}
+        </p>
 
         {telemetryTimeline && (
           <div className="telemetryResult">
