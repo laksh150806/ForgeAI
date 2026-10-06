@@ -3,12 +3,22 @@ from __future__ import annotations
 import asyncio
 import tempfile
 from contextlib import asynccontextmanager
+from dataclasses import dataclass
 from pathlib import Path
 from typing import AsyncIterator
 
 from fastapi import HTTPException
 
 from app.services.github_client import GitHubRepositoryRef, parse_github_repository_url
+
+
+@dataclass(frozen=True)
+class GitCommitSnapshot:
+    sha: str
+    authored_at_epoch: int
+    subject: str
+    changed_files: list[str]
+    patch: str
 
 
 def public_clone_url(ref: GitHubRepositoryRef) -> str:
@@ -39,9 +49,82 @@ async def _run_git(*args: str, cwd: Path | None = None, timeout: int = 90) -> tu
     )
 
 
+async def recent_commit_history(
+    root: Path,
+    limit: int = 10,
+    patch_char_limit: int = 20000,
+) -> list[GitCommitSnapshot]:
+    code, stdout, stderr = await _run_git(
+        "log",
+        f"-n{limit}",
+        "--format=%H%x1f%ct%x1f%s",
+        cwd=root,
+        timeout=30,
+    )
+    if code != 0:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not inspect repository history: {stderr[:500]}",
+        )
+
+    commits: list[GitCommitSnapshot] = []
+    for raw_line in stdout.splitlines():
+        parts = raw_line.split("\x1f", 2)
+        if len(parts) != 3:
+            continue
+        sha, epoch_text, subject = parts
+
+        files_code, files_stdout, _ = await _run_git(
+            "show",
+            "--format=",
+            "--name-only",
+            "--diff-filter=ACMRT",
+            sha,
+            cwd=root,
+            timeout=20,
+        )
+        changed_files = list(
+            dict.fromkeys(
+                line.strip()
+                for line in files_stdout.splitlines()
+                if line.strip()
+            )
+        ) if files_code == 0 else []
+
+        patch_code, patch_stdout, _ = await _run_git(
+            "show",
+            "--format=",
+            "--unified=0",
+            "--no-ext-diff",
+            sha,
+            "--",
+            cwd=root,
+            timeout=30,
+        )
+        patch = patch_stdout[:patch_char_limit] if patch_code == 0 else ""
+
+        try:
+            epoch = int(epoch_text)
+        except ValueError:
+            epoch = 0
+
+        commits.append(
+            GitCommitSnapshot(
+                sha=sha,
+                authored_at_epoch=epoch,
+                subject=subject,
+                changed_files=changed_files,
+                patch=patch,
+            )
+        )
+
+    return commits
+
+
 @asynccontextmanager
 async def public_repository_checkout(
     repository_url: str,
+    depth: int = 1,
 ) -> AsyncIterator[tuple[GitHubRepositoryRef, Path, str]]:
     ref = parse_github_repository_url(repository_url)
 
@@ -50,7 +133,7 @@ async def public_repository_checkout(
         code, _, stderr = await _run_git(
             "clone",
             "--depth",
-            "1",
+            str(max(1, depth)),
             "--single-branch",
             "--",
             public_clone_url(ref),

@@ -165,6 +165,28 @@ type Investigation = {
   suggested_next_actions: string[];
 };
 
+type SuspectCommit = {
+  sha: string;
+  short_sha: string;
+  subject: string;
+  authored_at: string;
+  changed_files: string[];
+  score: number;
+  confidence: number;
+  matching_terms: string[];
+  reasons: string[];
+};
+
+type IncidentCorrelation = {
+  repository: string;
+  incident: string;
+  head_sha: string;
+  correlation_mode: string;
+  suspected_commit: SuspectCommit | null;
+  candidates: SuspectCommit[];
+  investigation: Investigation;
+};
+
 const stages = [
   "Repository connected",
   "Codebase indexed",
@@ -179,6 +201,10 @@ export default function Home() {
   const [analysis, setAnalysis] = useState<Analysis | null>(null);
   const [search, setSearch] = useState<CodeSearch | null>(null);
   const [investigation, setInvestigation] = useState<Investigation | null>(null);
+  const [incident, setIncident] = useState("Production requests started returning 500 after the latest deploy.");
+  const [runtimeEvidence, setRuntimeEvidence] = useState("");
+  const [deploySha, setDeploySha] = useState("");
+  const [incidentResult, setIncidentResult] = useState<IncidentCorrelation | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
@@ -187,7 +213,7 @@ export default function Home() {
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -254,6 +280,36 @@ export default function Home() {
       setInvestigation(payload);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Investigation failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function correlateIncident() {
+    setLoading("incident");
+    setError("");
+    setIncidentResult(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/incidents/correlate`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          incident,
+          evidence: {
+            error_message: runtimeEvidence || null,
+            deploy_sha: deploySha || null,
+          },
+          lookback_commits: 10,
+          code_limit: 6,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Incident correlation failed.");
+      setIncidentResult(payload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Incident correlation failed.");
     } finally {
       setLoading(null);
     }
@@ -522,6 +578,100 @@ export default function Home() {
         </form>
 
         {error && <p className="error">{error}</p>}
+      </section>
+
+      <section className="panel incidentConsole">
+        <div className="analysisHeader">
+          <div>
+            <span className="label">PRODUCTION INCIDENT CORRELATION</span>
+            <h2>From runtime failure to suspect regression.</h2>
+            <p>
+              Add symptoms, an error or stack trace, and optionally the deployed commit.
+              ForgeAI correlates runtime evidence with recent diffs and code retrieval.
+            </p>
+          </div>
+          <span className="branch">runtime → commit → code</span>
+        </div>
+
+        <div className="incidentInputs">
+          <label>
+            <span>Incident</span>
+            <textarea value={incident} onChange={(e) => setIncident(e.target.value)} />
+          </label>
+          <label>
+            <span>Error / stack evidence</span>
+            <textarea
+              value={runtimeEvidence}
+              onChange={(e) => setRuntimeEvidence(e.target.value)}
+              placeholder="Paste an error message, stack trace, or relevant log lines"
+            />
+          </label>
+          <label>
+            <span>Deploy SHA (optional)</span>
+            <input
+              value={deploySha}
+              onChange={(e) => setDeploySha(e.target.value)}
+              placeholder="e.g. 174da2c9"
+            />
+          </label>
+          <button disabled={loading !== null} type="button" onClick={correlateIncident}>
+            {loading === "incident" ? "Correlating incident…" : "Find suspect regression"}
+          </button>
+        </div>
+
+        {incidentResult && (
+          <div className="incidentResult">
+            <div className="suspectCard">
+              <span className="label">PRIMARY SUSPECT</span>
+              {incidentResult.suspected_commit ? (
+                <>
+                  <div className="suspectHeader">
+                    <div>
+                      <strong>{incidentResult.suspected_commit.short_sha}</strong>
+                      <p>{incidentResult.suspected_commit.subject}</p>
+                    </div>
+                    <span className="score">
+                      {Math.round(incidentResult.suspected_commit.confidence * 100)}%
+                    </span>
+                  </div>
+                  <div className="symbols">
+                    {incidentResult.suspected_commit.changed_files.slice(0, 6).map((path) => (
+                      <code key={path}>{path}</code>
+                    ))}
+                  </div>
+                  <ul>
+                    {incidentResult.suspected_commit.reasons.map((reason) => (
+                      <li key={reason}>{reason}</li>
+                    ))}
+                  </ul>
+                </>
+              ) : (
+                <p>No recent commit crossed the evidence threshold.</p>
+              )}
+            </div>
+
+            <div className="incidentHypothesis">
+              <span className="label">CODE-LEVEL HYPOTHESIS</span>
+              <h3>{incidentResult.investigation.hypothesis.summary}</h3>
+              <p>
+                Confidence {Math.round(incidentResult.investigation.hypothesis.confidence * 100)}%
+                {" · "}{incidentResult.correlation_mode}
+              </p>
+            </div>
+
+            <div className="candidateList">
+              {incidentResult.candidates.slice(0, 4).map((candidate) => (
+                <article key={candidate.sha}>
+                  <div className="commandHeader">
+                    <strong>{candidate.short_sha} · {candidate.subject}</strong>
+                    <span>score {candidate.score.toFixed(2)}</span>
+                  </div>
+                  <p>{candidate.changed_files.slice(0, 3).join(" · ") || "No changed files detected"}</p>
+                </article>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
 
       {benchmark && (

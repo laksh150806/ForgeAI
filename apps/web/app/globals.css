@@ -1147,3 +1147,120 @@ button {
     padding: 12px 14px;
   }
 }
+
+
+.incidentConsole {
+  margin-bottom: 24px;
+  border-color: #3a4f69;
+  background:
+    linear-gradient(180deg, rgba(14, 24, 38, .96), rgba(8, 15, 24, .96));
+}
+
+.incidentInputs {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: 14px;
+  margin-top: 22px;
+}
+
+.incidentInputs label {
+  display: grid;
+  gap: 7px;
+}
+
+.incidentInputs label > span {
+  color: #8fa4bc;
+  font-size: .78rem;
+  font-weight: 700;
+}
+
+.incidentInputs textarea,
+.incidentInputs input {
+  width: 100%;
+  border: 1px solid #26384d;
+  background: #08111b;
+  color: #e7eef7;
+  border-radius: 12px;
+  padding: 13px 14px;
+  font: inherit;
+  outline: none;
+}
+
+.incidentInputs textarea {
+  min-height: 112px;
+  resize: vertical;
+}
+
+.incidentInputs label:nth-child(3),
+.incidentInputs > button {
+  grid-column: 1 / -1;
+}
+
+.incidentInputs > button {
+  justify-self: start;
+}
+
+.incidentResult {
+  display: grid;
+  gap: 14px;
+  margin-top: 24px;
+}
+
+.suspectCard,
+.incidentHypothesis,
+.candidateList article {
+  border: 1px solid #20344a;
+  background: #09131e;
+  border-radius: 15px;
+  padding: 16px;
+}
+
+.suspectHeader {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: flex-start;
+  margin-top: 10px;
+}
+
+.suspectHeader strong {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.1rem;
+  color: #c7ebff;
+}
+
+.suspectHeader p,
+.incidentHypothesis p,
+.candidateList p,
+.suspectCard li {
+  color: #94a7bc;
+  line-height: 1.55;
+}
+
+.suspectCard ul {
+  margin-bottom: 0;
+}
+
+.candidateList {
+  display: grid;
+  gap: 10px;
+}
+
+@media (max-width: 760px) {
+  .incidentInputs {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .incidentInputs label:nth-child(3),
+  .incidentInputs > button {
+    grid-column: auto;
+  }
+
+  .incidentInputs > button {
+    width: 100%;
+  }
+
+  .suspectHeader {
+    flex-direction: column;
+  }
+}

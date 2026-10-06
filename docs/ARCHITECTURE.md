@@ -5,7 +5,7 @@
 ForgeAI converts a software-engineering task into an auditable workflow:
 
 ```
-Repository -> Index -> Retrieve -> Investigate -> Plan -> Patch -> Validate -> Report
+Runtime Failure -> Deploy/Commit Correlation -> Retrieve -> Root Cause -> Plan -> Patch -> Validate -> Report
 ```
 
 ## Initial system boundaries
@@ -107,3 +107,17 @@ Execution traces can be persisted to a `forgeai_runs` JSONB-backed table. Persis
 best-effort for workflow execution: a database write failure never rewrites a successful
 agent result, while the readiness endpoint still surfaces persistent-infrastructure
 failures to operators.
+
+
+### Production incident correlation
+
+The incident-correlation stage accepts runtime symptoms, error text, stack traces/log lines,
+and an optional deployed commit SHA. For public repositories, ForgeAI checks out a bounded
+recent Git history, inspects changed files and diff text, and ranks commits using deterministic
+runtime-term overlap, direct file mentions, recency, explicit deploy identity, and overlap with
+code-retrieval evidence. The highest-scoring recent commit becomes the primary regression
+suspect only when it crosses a minimum evidence threshold.
+
+This stage intentionally separates **runtime-to-change correlation** from ordinary code search.
+The same runtime evidence is also sent through code retrieval and the investigation agent so
+ForgeAI can compare "what changed recently" with "what code best explains the failure."
