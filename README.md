@@ -445,3 +445,44 @@ ForgeAI finds the first failure, selects the nearest deploy that happened before
 collects surrounding telemetry as runtime evidence, and then runs the commit/diff +
 code-retrieval correlator. Telemetry is persisted in Supabase/Postgres when
 `DATABASE_URL` is configured and falls back to bounded in-memory storage otherwise.
+
+
+## Automatic Render telemetry adapter
+
+ForgeAI can poll Render's REST API for recent deploys and logs, normalize them into
+ForgeAI telemetry, persist them, and optionally reconstruct an incident timeline in the
+same request.
+
+Server-side configuration:
+
+```env
+RENDER_API_KEY=...
+RENDER_WORKSPACE_ID=...
+RENDER_SERVICE_ID=...
+```
+
+The API key stays on the FastAPI service and is never returned to the browser.
+
+Check configuration:
+
+```http
+GET /api/v1/integrations/render/status
+```
+
+Sync recent Render telemetry:
+
+```http
+POST /api/v1/integrations/render/sync
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/laksh150806/ForgeAI",
+  "lookback_minutes": 60,
+  "log_limit": 100,
+  "deploy_limit": 20,
+  "reconstruct_timeline": true
+}
+```
+
+This uses Render's free REST API polling path rather than Render workspace webhooks, which
+are a paid-plan feature.
