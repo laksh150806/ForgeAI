@@ -486,3 +486,49 @@ Content-Type: application/json
 
 This uses Render's free REST API polling path rather than Render workspace webhooks, which
 are a paid-plan feature.
+
+
+## Provider-agnostic runtime adapters
+
+ForgeAI runtime integrations normalize provider-specific deployment/log data into the same
+internal `TelemetryEvent` model before persistence and incident reconstruction.
+
+Current providers:
+
+- **Render** — deploy history + application logs through Render's REST API.
+- **Vercel** — deployment history + build/deployment events through Vercel's REST API.
+- **Generic telemetry** — any provider or application can post normalized runtime events to
+  `POST /api/v1/telemetry/events`.
+
+Vercel server-side configuration:
+
+```env
+VERCEL_TOKEN=...
+VERCEL_PROJECT_ID=prj_...
+VERCEL_TEAM_ID=team_...   # optional for personal scope
+```
+
+Check status:
+
+```http
+GET /api/v1/integrations/vercel/status
+```
+
+Sync recent Vercel deployments and build events:
+
+```http
+POST /api/v1/integrations/vercel/sync
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/owner/repository",
+  "lookback_minutes": 120,
+  "deploy_limit": 10,
+  "event_limit_per_deploy": 100,
+  "reconstruct_timeline": true
+}
+```
+
+Vercel runtime logs are intentionally not claimed as available through the normal Hobby REST
+path. Runtime failures can always enter through ForgeAI's generic telemetry endpoint; paid
+Vercel Log Drains can be adapted later without changing the core incident pipeline.

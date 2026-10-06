@@ -8,9 +8,8 @@ import httpx
 from fastapi import HTTPException
 
 from app.schemas.render_adapter import RenderAdapterStatus, RenderSyncRequest, RenderSyncResponse
-from app.schemas.telemetry import TelemetryEvent, TelemetryTimelineRequest
-from app.services.telemetry_store import save_events
-from app.services.telemetry_timeline import reconstruct_timeline
+from app.schemas.telemetry import TelemetryEvent
+from app.services.runtime_provider import persist_provider_events
 
 
 RENDER_API = "https://api.render.com/v1"
@@ -236,30 +235,21 @@ async def sync_render(payload: RenderSyncRequest) -> RenderSyncResponse:
         if event.observed_at >= start
     ]
     log_events = normalize_render_logs(logs_response.json(), service_id)
-    events_by_id = {str(event.event_id): event for event in [*deploy_events, *log_events]}
-    events = sorted(events_by_id.values(), key=lambda event: event.observed_at)
-
-    storage = await save_events(events) if events else ("postgres" if os.getenv("DATABASE_URL") else "memory")
-
-    timeline = None
-    if payload.reconstruct_timeline and payload.repository_url:
-        timeline = await reconstruct_timeline(
-            TelemetryTimelineRequest(
-                repository_url=payload.repository_url,
-                service=service_id,
-                lookback_minutes=payload.lookback_minutes,
-                max_events=min(500, max(payload.log_limit + payload.deploy_limit, 20)),
-                lookback_commits=20,
-                code_limit=6,
-            )
-        )
+    provider_result = await persist_provider_events(
+        events=[*deploy_events, *log_events],
+        repository_url=str(payload.repository_url) if payload.repository_url else None,
+        service=service_id,
+        lookback_minutes=payload.lookback_minutes,
+        max_events=payload.log_limit + payload.deploy_limit,
+        reconstruct=payload.reconstruct_timeline,
+    )
 
     return RenderSyncResponse(
         service_id=service_id,
         workspace_id=workspace_id,
         deploy_events=len(deploy_events),
         log_events=len(log_events),
-        accepted_events=len(events),
-        storage=storage,
-        timeline=timeline,
+        accepted_events=provider_result.accepted_events,
+        storage=provider_result.storage,
+        timeline=provider_result.timeline,
     )

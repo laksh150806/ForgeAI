@@ -235,6 +235,25 @@ type RenderSyncResult = {
   timeline: TelemetryTimeline | null;
 };
 
+type VercelAdapterStatus = {
+  configured: boolean;
+  project_id: string | null;
+  team_id: string | null;
+  token_configured: boolean;
+  runtime_logs_mode: string;
+};
+
+type VercelSyncResult = {
+  project_id: string;
+  team_id: string | null;
+  deployment_events: number;
+  build_events: number;
+  accepted_events: number;
+  storage: string;
+  runtime_logs_mode: string;
+  timeline: TelemetryTimeline | null;
+};
+
 const stages = [
   "Repository connected",
   "Codebase indexed",
@@ -257,6 +276,8 @@ export default function Home() {
   const [telemetryTimeline, setTelemetryTimeline] = useState<TelemetryTimeline | null>(null);
   const [renderStatus, setRenderStatus] = useState<RenderAdapterStatus | null>(null);
   const [renderSync, setRenderSync] = useState<RenderSyncResult | null>(null);
+  const [vercelStatus, setVercelStatus] = useState<VercelAdapterStatus | null>(null);
+  const [vercelSync, setVercelSync] = useState<VercelSyncResult | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
@@ -265,7 +286,7 @@ export default function Home() {
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "telemetry" | "render" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "telemetry" | "render" | "vercel" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -297,6 +318,10 @@ export default function Home() {
     fetch(`${apiUrl}/api/v1/integrations/render/status`)
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => payload && setRenderStatus(payload))
+      .catch(() => {});
+    fetch(`${apiUrl}/api/v1/integrations/vercel/status`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => payload && setVercelStatus(payload))
       .catch(() => {});
   }, []);
 
@@ -468,6 +493,34 @@ export default function Home() {
       if (payload.timeline) setTelemetryTimeline(payload.timeline);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Render telemetry sync failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function syncVercelTelemetry() {
+    setLoading("vercel");
+    setError("");
+    setVercelSync(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/integrations/vercel/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          lookback_minutes: 120,
+          deploy_limit: 10,
+          event_limit_per_deploy: 100,
+          reconstruct_timeline: true,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Vercel telemetry sync failed.");
+      setVercelSync(payload);
+      if (payload.timeline) setTelemetryTimeline(payload.timeline);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Vercel telemetry sync failed.");
     } finally {
       setLoading(null);
     }
@@ -853,20 +906,46 @@ export default function Home() {
           <button disabled={loading !== null} type="button" onClick={ingestAndReconstructDemoTelemetry}>
             {loading === "telemetry" ? "Reconstructing timeline…" : "Ingest demo telemetry + reconstruct"}
           </button>
-          <button
-            className="secondaryButton"
-            disabled={loading !== null || renderStatus?.configured === false}
-            type="button"
-            onClick={syncRenderTelemetry}
-          >
-            {loading === "render" ? "Syncing Render…" : "Sync Render automatically"}
-          </button>
+        </div>
+
+        <div className="runtimeProviders">
+          <article>
+            <div className="commandHeader">
+              <strong>Render</strong>
+              <span>{renderStatus?.configured ? "connected" : "not configured"}</span>
+            </div>
+            <p>Deploy history + application logs via Render REST API.</p>
+            <button
+              className="secondaryButton"
+              disabled={loading !== null || renderStatus?.configured !== true}
+              type="button"
+              onClick={syncRenderTelemetry}
+            >
+              {loading === "render" ? "Syncing Render…" : "Sync Render"}
+            </button>
+            {renderSync && <small>{renderSync.accepted_events} events → {renderSync.storage}</small>}
+          </article>
+
+          <article>
+            <div className="commandHeader">
+              <strong>Vercel</strong>
+              <span>{vercelStatus?.configured ? "connected" : "not configured"}</span>
+            </div>
+            <p>Deployments + build events. Runtime errors use generic telemetry or a Log Drain.</p>
+            <button
+              className="secondaryButton"
+              disabled={loading !== null || vercelStatus?.configured !== true}
+              type="button"
+              onClick={syncVercelTelemetry}
+            >
+              {loading === "vercel" ? "Syncing Vercel…" : "Sync Vercel"}
+            </button>
+            {vercelSync && <small>{vercelSync.accepted_events} events → {vercelSync.storage}</small>}
+          </article>
         </div>
 
         <p className="adapterStatus">
-          Render adapter: {renderStatus?.configured ? "configured" : "not configured"}
-          {renderStatus?.service_id ? ` · ${renderStatus.service_id}` : ""}
-          {renderSync ? ` · ${renderSync.accepted_events} events synced to ${renderSync.storage}` : ""}
+          Provider-independent telemetry: Render and Vercel normalize into the same ForgeAI event model.
         </p>
 
         {telemetryTimeline && (
