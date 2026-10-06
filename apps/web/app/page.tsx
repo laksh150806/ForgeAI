@@ -177,6 +177,33 @@ type SuspectCommit = {
   reasons: string[];
 };
 
+type ImpactNode = {
+  id: string;
+  path: string;
+  symbol: string;
+  kind: string;
+  line_start: number;
+  line_end: number | null;
+  entrypoint: boolean;
+};
+
+type ImpactAnalysis = {
+  repository: string;
+  commit_sha: string;
+  graph_mode: string;
+  graph_nodes: number;
+  graph_edges: number;
+  changed_symbols: ImpactNode[];
+  runtime_matches: ImpactNode[];
+  callers: ImpactNode[];
+  downstream: ImpactNode[];
+  affected_entrypoints: ImpactNode[];
+  evidence_paths: string[][];
+  blast_radius_score: number;
+  confidence: number;
+  explanation: string[];
+};
+
 type IncidentCorrelation = {
   repository: string;
   incident: string;
@@ -185,6 +212,7 @@ type IncidentCorrelation = {
   suspected_commit: SuspectCommit | null;
   candidates: SuspectCommit[];
   investigation: Investigation;
+  impact: ImpactAnalysis | null;
 };
 
 type TelemetryTimeline = {
@@ -272,6 +300,7 @@ export default function Home() {
   const [runtimeEvidence, setRuntimeEvidence] = useState("");
   const [deploySha, setDeploySha] = useState("");
   const [incidentResult, setIncidentResult] = useState<IncidentCorrelation | null>(null);
+  const [impactResult, setImpactResult] = useState<ImpactAnalysis | null>(null);
   const [telemetryService, setTelemetryService] = useState("forgeai-api");
   const [telemetryTimeline, setTelemetryTimeline] = useState<TelemetryTimeline | null>(null);
   const [renderStatus, setRenderStatus] = useState<RenderAdapterStatus | null>(null);
@@ -286,7 +315,7 @@ export default function Home() {
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "telemetry" | "render" | "vercel" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "impact" | "telemetry" | "render" | "vercel" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -389,8 +418,36 @@ export default function Home() {
       const payload = await response.json();
       if (!response.ok) throw new Error(payload.detail ?? "Incident correlation failed.");
       setIncidentResult(payload);
+      if (payload.impact) setImpactResult(payload.impact);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Incident correlation failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function analyzeBlastRadius() {
+    setLoading("impact");
+    setError("");
+    setImpactResult(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/impact/analyze`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          commit_sha: incidentResult?.suspected_commit?.sha || deploySha || null,
+          runtime_text: [incident, runtimeEvidence].filter(Boolean).join("\n"),
+          lookback_commits: 20,
+          max_depth: 3,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Blast-radius analysis failed.");
+      setImpactResult(payload);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Blast-radius analysis failed.");
     } finally {
       setLoading(null);
     }
@@ -880,6 +937,86 @@ export default function Home() {
                   <p>{candidate.changed_files.slice(0, 3).join(" · ") || "No changed files detected"}</p>
                 </article>
               ))}
+            </div>
+          </div>
+        )}
+      </section>
+
+      <section className="panel">
+        <div className="analysisHeader">
+          <div>
+            <span className="label">DEPENDENCY / CALL GRAPH</span>
+            <h2>Trace the regression&apos;s blast radius.</h2>
+            <p>
+              Map changed symbols to runtime evidence, upstream callers, downstream dependencies,
+              and affected endpoints using a bounded static graph.
+            </p>
+          </div>
+          <span className="branch">diff → symbol → runtime path</span>
+        </div>
+
+        <div className="validateAction">
+          <button disabled={loading !== null} type="button" onClick={analyzeBlastRadius}>
+            {loading === "impact" ? "Tracing blast radius…" : "Analyze blast radius"}
+          </button>
+        </div>
+
+        {impactResult && (
+          <div>
+            <div className="metrics">
+              <article><span>Blast radius</span><strong>{impactResult.blast_radius_score.toFixed(0)}/100</strong></article>
+              <article><span>Graph nodes</span><strong>{impactResult.graph_nodes}</strong></article>
+              <article><span>Affected entrypoints</span><strong>{impactResult.affected_entrypoints.length}</strong></article>
+            </div>
+
+            <div className="investigationGrid">
+              <div>
+                <h3>Changed symbols</h3>
+                <div className="resultList">
+                  {impactResult.changed_symbols.slice(0, 8).map((node) => (
+                    <article className="resultCard" key={node.id}>
+                      <div className="commandHeader">
+                        <strong>{node.symbol}</strong>
+                        <span>{node.kind} · L{node.line_start}</span>
+                      </div>
+                      <code>{node.path}</code>
+                    </article>
+                  ))}
+                </div>
+              </div>
+
+              <div>
+                <h3>Affected entrypoints</h3>
+                {impactResult.affected_entrypoints.length > 0 ? (
+                  <div className="resultList">
+                    {impactResult.affected_entrypoints.slice(0, 8).map((node) => (
+                      <article className="resultCard" key={node.id}>
+                        <div className="commandHeader">
+                          <strong>{node.symbol}</strong>
+                          <span>L{node.line_start}</span>
+                        </div>
+                        <code>{node.path}</code>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="muted">No route/entrypoint reached within the bounded traversal.</p>
+                )}
+              </div>
+            </div>
+
+            <div className="validationNotes">
+              <h3>Graph evidence</h3>
+              <ul>
+                {impactResult.explanation.map((item) => <li key={item}>{item}</li>)}
+              </ul>
+              {impactResult.evidence_paths.length > 0 && (
+                <div className="commandList">
+                  {impactResult.evidence_paths.slice(0, 6).map((path, index) => (
+                    <code key={index}>{path.join(" → ")}</code>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
