@@ -1368,3 +1368,41 @@ button {
   font-size: .78rem;
   overflow-wrap: anywhere;
 }
+
+
+.runtimeProviders {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 18px;
+}
+
+.runtimeProviders article {
+  display: grid;
+  gap: 10px;
+  border: 1px solid #203247;
+  background: #09121c;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.runtimeProviders p,
+.runtimeProviders small {
+  margin: 0;
+  color: #8fa3b9;
+  line-height: 1.5;
+}
+
+.runtimeProviders button {
+  justify-self: start;
+}
+
+@media (max-width: 760px) {
+  .runtimeProviders {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .runtimeProviders button {
+    width: 100%;
+  }
+}
