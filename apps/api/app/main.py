@@ -11,12 +11,13 @@ from app.routes.planning import router as planning_router
 from app.routes.pull_requests import router as pull_requests_router
 from app.routes.repositories import router as repositories_router
 from app.routes.runs import router as runs_router
+from app.routes.telemetry import router as telemetry_router
 from app.routes.validation import router as validation_router
 from app.services.trace_store import database_ready
 
 app = FastAPI(
     title="ForgeAI API",
-    version="0.11.0",
+    version="0.12.0",
     description="Autonomous software engineering and incident intelligence platform.",
 )
 
@@ -43,6 +44,7 @@ app.include_router(planning_router)
 app.include_router(pull_requests_router)
 app.include_router(validation_router)
 app.include_router(runs_router)
+app.include_router(telemetry_router)
 
 
 @app.get("/health")
@@ -64,6 +66,6 @@ async def ready() -> dict[str, str]:
 def status() -> dict[str, str]:
     return {
         "product": "ForgeAI",
-        "phase": "incident-correlation",
-        "capability": "runtime-to-code regression correlation with persistent execution traces",
+        "phase": "telemetry-timeline",
+        "capability": "persistent telemetry ingestion and production incident timeline reconstruction",
     }
