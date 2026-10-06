@@ -6,6 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.routes.code_intelligence import router as code_intelligence_router
 from app.routes.investigations import router as investigations_router
 from app.routes.incidents import router as incidents_router
+from app.routes.integrations import router as integrations_router
 from app.routes.evaluation import router as evaluation_router
 from app.routes.planning import router as planning_router
 from app.routes.pull_requests import router as pull_requests_router
@@ -17,7 +18,7 @@ from app.services.trace_store import database_ready
 
 app = FastAPI(
     title="ForgeAI API",
-    version="0.12.0",
+    version="0.13.0",
     description="Autonomous software engineering and incident intelligence platform.",
 )
 
@@ -39,6 +40,7 @@ app.include_router(repositories_router)
 app.include_router(code_intelligence_router)
 app.include_router(investigations_router)
 app.include_router(incidents_router)
+app.include_router(integrations_router)
 app.include_router(evaluation_router)
 app.include_router(planning_router)
 app.include_router(pull_requests_router)
@@ -66,6 +68,6 @@ async def ready() -> dict[str, str]:
 def status() -> dict[str, str]:
     return {
         "product": "ForgeAI",
-        "phase": "telemetry-timeline",
-        "capability": "persistent telemetry ingestion and production incident timeline reconstruction",
+        "phase": "render-adapter",
+        "capability": "automatic Render deploy/log ingestion with production incident reconstruction",
     }
