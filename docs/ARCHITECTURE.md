@@ -121,3 +121,22 @@ suspect only when it crosses a minimum evidence threshold.
 This stage intentionally separates **runtime-to-change correlation** from ordinary code search.
 The same runtime evidence is also sent through code retrieval and the investigation agent so
 ForgeAI can compare "what changed recently" with "what code best explains the failure."
+
+
+### Telemetry persistence and timeline reconstruction
+
+Normalized production events are accepted through the telemetry ingestion API and persisted
+to `forgeai_telemetry_events`. Events carry an event ID, observed time, source, event type,
+severity, service, message, optional deploy SHA, and structured metadata.
+
+Timeline reconstruction is causal rather than purely chronological:
+
+1. Load bounded recent events for the requested service.
+2. Identify the first error/exception/failure/crash/alert.
+3. Select the closest deploy/release event at or before that failure.
+4. Collect surrounding events into runtime evidence.
+5. Pass the nearest deploy SHA and runtime evidence into incident correlation.
+6. Return the full ordered timeline plus the correlated suspect commit and code hypothesis.
+
+This creates the runtime-to-code bridge needed for production debugging while keeping each
+signal explicit and auditable.

@@ -394,3 +394,54 @@ step toward the full target flow:
 ```text
 runtime failure → suspect deploy → changed symbols → root cause → patch → validation → approval → PR
 ```
+
+
+## Telemetry ingestion and incident timeline reconstruction
+
+ForgeAI can persist normalized production telemetry and reconstruct the causal window around an incident.
+
+Ingest deploy/log/error events:
+
+```http
+POST /api/v1/telemetry/events
+Content-Type: application/json
+
+{
+  "events": [
+    {
+      "source": "render",
+      "event_type": "deploy",
+      "severity": "info",
+      "service": "payments-api",
+      "message": "Deployment completed",
+      "deploy_sha": "8f3a2c1"
+    },
+    {
+      "source": "application",
+      "event_type": "error",
+      "severity": "error",
+      "service": "payments-api",
+      "message": "PaymentTimeout in capture_payment"
+    }
+  ]
+}
+```
+
+Reconstruct the timeline:
+
+```http
+POST /api/v1/telemetry/timeline
+Content-Type: application/json
+
+{
+  "repository_url": "https://github.com/owner/repository",
+  "service": "payments-api",
+  "lookback_minutes": 120,
+  "lookback_commits": 20
+}
+```
+
+ForgeAI finds the first failure, selects the nearest deploy that happened before it,
+collects surrounding telemetry as runtime evidence, and then runs the commit/diff +
+code-retrieval correlator. Telemetry is persisted in Supabase/Postgres when
+`DATABASE_URL` is configured and falls back to bounded in-memory storage otherwise.
