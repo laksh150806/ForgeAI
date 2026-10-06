@@ -115,6 +115,80 @@ jobs:
           print("Incident correlation live smoke: OK")
           PY
 
+      - name: Check live telemetry timeline
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          deploy_time=$(date -u -d '5 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+          warn_time=$(date -u -d '2 minutes ago' +%Y-%m-%dT%H:%M:%SZ)
+          error_time=$(date -u -d '1 minute ago' +%Y-%m-%dT%H:%M:%SZ)
+
+          cat > /tmp/telemetry.json <<JSON
+          {
+            "events": [
+              {
+                "observed_at": "$deploy_time",
+                "source": "github-actions-smoke",
+                "event_type": "deploy",
+                "severity": "info",
+                "service": "forgeai-smoke",
+                "message": "Production deploy completed",
+                "deploy_sha": "1e1df3a5de27e15afbfe8aae1173ff402ca9194a",
+                "metadata": {"environment": "production"}
+              },
+              {
+                "observed_at": "$warn_time",
+                "source": "github-actions-smoke",
+                "event_type": "log",
+                "severity": "warning",
+                "service": "forgeai-smoke",
+                "message": "Telemetry timeline latency increased after deploy",
+                "metadata": {}
+              },
+              {
+                "observed_at": "$error_time",
+                "source": "github-actions-smoke",
+                "event_type": "error",
+                "severity": "error",
+                "service": "forgeai-smoke",
+                "message": "Failure in apps/api/app/services/telemetry_timeline.py reconstruct_timeline",
+                "metadata": {}
+              }
+            ]
+          }
+          JSON
+
+          curl --fail --show-error --silent \
+            -X POST \
+            -H "Content-Type: application/json" \
+            --data-binary @/tmp/telemetry.json \
+            https://forgeai-api-ok42.onrender.com/api/v1/telemetry/events \
+            | tee /tmp/telemetry-ingest.json
+
+          curl --fail --show-error --silent \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"repository_url":"https://github.com/laksh150806/ForgeAI","service":"forgeai-smoke","lookback_minutes":30,"max_events":100,"lookback_commits":20,"code_limit":6}' \
+            https://forgeai-api-ok42.onrender.com/api/v1/telemetry/timeline \
+            | tee /tmp/telemetry-timeline.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/telemetry-ingest.json') as f:
+              ingest = json.load(f)
+          with open('/tmp/telemetry-timeline.json') as f:
+              timeline = json.load(f)
+          assert ingest["accepted"] == 3
+          assert ingest["storage"] in {"postgres", "memory"}
+          assert timeline["first_failure_at"]
+          assert timeline["nearest_deploy"]
+          assert timeline["nearest_deploy"]["deploy_sha"].startswith("1e1df3a5")
+          assert timeline["correlation"]
+          assert timeline["correlation"]["candidates"]
+          print("Telemetry timeline live smoke: OK")
+          PY
+
       - name: Check live trace history
         shell: bash
         run: |
