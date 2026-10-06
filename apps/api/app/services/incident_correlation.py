@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from collections import Counter
+
+from fastapi import HTTPException
 from datetime import datetime, timezone
 from pathlib import PurePosixPath
 
@@ -12,6 +14,8 @@ from app.schemas.incident import (
 from app.services.code_intelligence import query_tokens, search_repository_code
 from app.services.git_repository import GitCommitSnapshot, public_repository_checkout, recent_commit_history
 from app.services.investigation_agent import investigate_repository
+from app.schemas.impact import ImpactAnalysisRequest
+from app.services.impact_analysis import analyze_impact
 
 
 def _runtime_text(payload: IncidentCorrelationRequest) -> str:
@@ -149,6 +153,32 @@ async def correlate_incident(
     top_candidates = ranked[:5]
     suspected = top_candidates[0] if top_candidates and top_candidates[0].score > 1.0 else None
 
+    impact = None
+    if suspected is not None:
+        try:
+            impact = await analyze_impact(
+                ImpactAnalysisRequest(
+                    repository_url=payload.repository_url,
+                    commit_sha=suspected.sha,
+                    runtime_text=runtime_text,
+                    stack_trace=payload.evidence.stack_trace,
+                    lookback_commits=payload.lookback_commits,
+                    max_depth=3,
+                )
+            )
+        except HTTPException:
+            impact = None
+
+        if impact is not None and impact.blast_radius_score > 0:
+            graph_bonus = min(5.0, impact.blast_radius_score / 20.0)
+            suspected.score = round(suspected.score + graph_bonus, 3)
+            suspected.confidence = _confidence(suspected.score)
+            suspected.reasons.append(
+                f"Static graph impact adds {graph_bonus:.2f} points: "
+                f"blast radius {impact.blast_radius_score:.1f}/100 across "
+                f"{len(impact.affected_entrypoints)} affected entrypoint(s)."
+            )
+
     investigation = await investigate_repository(
         repository_url=repository_url,
         task=runtime_text,
@@ -160,8 +190,9 @@ async def correlate_incident(
         repository=ref.full_name,
         incident=payload.incident,
         head_sha=head_sha,
-        correlation_mode="git-history+runtime-evidence+code-retrieval",
+        correlation_mode="git-history+runtime-evidence+code-retrieval+blast-radius",
         suspected_commit=suspected,
         candidates=top_candidates,
         investigation=investigation,
+        impact=impact,
     )
