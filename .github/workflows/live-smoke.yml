@@ -72,6 +72,38 @@ jobs:
           assert m['cases'] >= 3
           PY
 
+
+      - name: Run live impact regression benchmark
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            https://forgeai-api-ok42.onrender.com/api/v1/evaluation/impact-seed \
+            | tee /tmp/impact-benchmark.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/impact-benchmark.json') as f:
+              data = json.load(f)
+
+          m = data["metrics"]
+          assert m["cases"] == 2
+          assert m["impact_cases"] == 2
+          assert m["impact_changed_symbol_accuracy"] == 1.0
+          assert m["impact_runtime_symbol_accuracy"] == 1.0
+          assert m["impact_entrypoint_accuracy"] == 1.0
+          assert m["average_blast_radius_score"] is not None
+          assert m["average_blast_radius_score"] > 0
+          assert all(result["blast_radius_score"] > 0 for result in data["results"])
+          print(
+              "Impact benchmark:",
+              "changed-symbol", m["impact_changed_symbol_accuracy"],
+              "runtime-symbol", m["impact_runtime_symbol_accuracy"],
+              "entrypoint", m["impact_entrypoint_accuracy"],
+              "avg blast radius", m["average_blast_radius_score"],
+          )
+          PY
+
       - name: Check live Generate Plan
         shell: bash
         run: |
