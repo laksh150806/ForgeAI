@@ -2,6 +2,7 @@ from app.services.git_repository import GitCommitSnapshot
 from app.services.impact_analysis import (
     _bounded,
     _changed_nodes,
+    _prioritize_runtime_nodes,
     build_symbol_graph,
     parse_changed_lines,
 )
@@ -112,3 +113,25 @@ export function renderPage() {
         and edge.target == "src/data.ts::loadData"
         for edge in edges
     )
+
+
+
+def test_runtime_relevant_changed_nodes_are_kept_before_truncation():
+    from app.schemas.impact import ImpactNode
+
+    nodes = [
+        ImpactNode(
+            id=f"app/file_{index:02d}.py::symbol_{index:02d}",
+            path=f"app/file_{index:02d}.py",
+            symbol=f"symbol_{index:02d}",
+            kind="function",
+            line_start=index + 1,
+        )
+        for index in range(35)
+    ]
+    runtime_node = nodes[-1]
+
+    prioritized = _prioritize_runtime_nodes(nodes, {runtime_node.id}, 30)
+
+    assert len(prioritized) == 30
+    assert prioritized[0].id == runtime_node.id
