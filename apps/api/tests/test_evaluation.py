@@ -90,3 +90,61 @@ def test_benchmark_can_reuse_one_repository_index_shape() -> None:
     assert index.repository == "owner/repo"
     assert index.indexed_files == 1
     assert len(index.chunks) == 1
+
+
+
+def test_aggregate_metrics_reports_impact_quality_separately() -> None:
+    results = [
+        BenchmarkCaseResult(
+            id="impact-a",
+            repository="o/r",
+            retrieval_mode="lexical",
+            latency_ms=120,
+            ranked_files=["impact.py"],
+            top1_hit=True,
+            topk_recall=1.0,
+            reciprocal_rank=1.0,
+            symbol_hit=True,
+            impact_changed_symbol_hit=True,
+            impact_runtime_symbol_hit=True,
+            impact_entrypoint_hit=True,
+            blast_radius_score=62.5,
+            impact_confidence=0.67,
+        ),
+        BenchmarkCaseResult(
+            id="impact-b",
+            repository="o/r",
+            retrieval_mode="lexical",
+            latency_ms=180,
+            ranked_files=["incident.py"],
+            top1_hit=True,
+            topk_recall=1.0,
+            reciprocal_rank=1.0,
+            symbol_hit=True,
+            impact_changed_symbol_hit=True,
+            impact_runtime_symbol_hit=False,
+            impact_entrypoint_hit=True,
+            blast_radius_score=37.5,
+            impact_confidence=0.48,
+        ),
+    ]
+
+    metrics = aggregate_metrics(results, top_k=3)
+    assert metrics.impact_cases == 2
+    assert metrics.impact_changed_symbol_accuracy == 1.0
+    assert metrics.impact_runtime_symbol_accuracy == 0.5
+    assert metrics.impact_entrypoint_accuracy == 1.0
+    assert metrics.average_blast_radius_score == 50.0
+
+
+def test_impact_seed_cases_are_pinned_and_graph_labeled() -> None:
+    from app.routes.evaluation import IMPACT_SEED_CASES
+
+    assert len(IMPACT_SEED_CASES) == 2
+    for case in IMPACT_SEED_CASES:
+        assert case.impact_commit_sha == "3dd89c8b4ebebf24a70aef672f8c13846853eab8"
+        assert case.impact_runtime_text
+        assert case.expected_changed_symbols
+        assert case.expected_runtime_symbols
+        assert case.expected_affected_entrypoints
+        assert case.impact_lookback_commits <= 100
