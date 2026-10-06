@@ -189,6 +189,50 @@ jobs:
           print("Telemetry timeline live smoke: OK")
           PY
 
+      - name: Check live Render adapter sync
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          curl --fail --show-error --silent \
+            https://forgeai-api-ok42.onrender.com/api/v1/integrations/render/status \
+            | tee /tmp/render-status.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/render-status.json') as f:
+              data = json.load(f)
+          assert data["configured"] is True
+          assert data["api_key_configured"] is True
+          assert data["service_id"] == "srv-db1qoj49v7es738q3u5g"
+          print("Render adapter status: configured")
+          PY
+
+          curl --fail --show-error --silent \
+            -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"repository_url":"https://github.com/laksh150806/ForgeAI","lookback_minutes":60,"log_limit":100,"deploy_limit":20,"reconstruct_timeline":true}' \
+            https://forgeai-api-ok42.onrender.com/api/v1/integrations/render/sync \
+            | tee /tmp/render-sync.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/render-sync.json') as f:
+              data = json.load(f)
+          assert data["service_id"] == "srv-db1qoj49v7es738q3u5g"
+          assert data["accepted_events"] >= 1
+          assert data["storage"] in {"postgres", "memory"}
+          print(
+              "Render sync:",
+              data["deploy_events"],
+              "deploy events,",
+              data["log_events"],
+              "log events,",
+              data["accepted_events"],
+              "accepted",
+          )
+          PY
+
       - name: Check live trace history
         shell: bash
         run: |
