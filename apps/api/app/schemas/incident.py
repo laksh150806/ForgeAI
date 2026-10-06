@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import BaseModel, Field, HttpUrl
 
 from app.schemas.investigation import InvestigationResponse
+from app.schemas.impact import ImpactAnalysisResponse
 
 
 class RuntimeEvidence(BaseModel):
@@ -43,3 +44,4 @@ class IncidentCorrelationResponse(BaseModel):
     suspected_commit: SuspectCommit | None
     candidates: list[SuspectCommit]
     investigation: InvestigationResponse
+    impact: ImpactAnalysisResponse | None = None
