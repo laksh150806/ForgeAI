@@ -49,6 +49,22 @@ async def _run_git(*args: str, cwd: Path | None = None, timeout: int = 90) -> tu
     )
 
 
+async def checkout_repository_commit(root: Path, sha: str) -> None:
+    code, _, stderr = await _run_git(
+        "checkout",
+        "--detach",
+        "--force",
+        sha,
+        cwd=root,
+        timeout=30,
+    )
+    if code != 0:
+        raise HTTPException(
+            status_code=502,
+            detail=f"Could not materialize target commit {sha[:8]}: {stderr[:500]}",
+        )
+
+
 async def recent_commit_history(
     root: Path,
     limit: int = 10,
