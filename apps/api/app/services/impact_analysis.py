@@ -3,7 +3,7 @@ from __future__ import annotations
 import ast
 import re
 from collections import defaultdict, deque
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from pathlib import Path, PurePosixPath
 
 from fastapi import HTTPException
@@ -17,6 +17,7 @@ from app.services.code_intelligence import extract_js_symbols, extract_python_sy
 from app.services.git_repository import (
     GitCommitSnapshot,
     checkout_repository_commit,
+    commit_patch_for_files,
     public_repository_checkout,
     recent_commit_history,
 )
@@ -382,6 +383,21 @@ async def analyze_impact(payload: ImpactAnalysisRequest) -> ImpactAnalysisRespon
     async with public_repository_checkout(repository_url, depth=depth) as (ref, root, _):
         history = await recent_commit_history(root, limit=payload.lookback_commits)
         commit = _select_commit(history, payload.commit_sha)
+
+        source_changed_files: list[str] = []
+        for path in commit.changed_files:
+            classified = classify_path(path, None)
+            if not classified.ignored and classified.kind == "source":
+                source_changed_files.append(path)
+
+        exact_patch = await commit_patch_for_files(
+            root,
+            commit.sha,
+            source_changed_files,
+        )
+        if exact_patch:
+            commit = replace(commit, patch=exact_patch)
+
         await checkout_repository_commit(root, commit.sha)
 
         files: dict[str, tuple[str, str | None]] = {}
