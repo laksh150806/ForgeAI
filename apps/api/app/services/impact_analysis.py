@@ -14,7 +14,12 @@ from app.schemas.impact import (
     ImpactNode,
 )
 from app.services.code_intelligence import extract_js_symbols, extract_python_symbols
-from app.services.git_repository import GitCommitSnapshot, public_repository_checkout, recent_commit_history
+from app.services.git_repository import (
+    GitCommitSnapshot,
+    checkout_repository_commit,
+    public_repository_checkout,
+    recent_commit_history,
+)
 from app.services.repository_intelligence import classify_path
 
 
@@ -377,6 +382,7 @@ async def analyze_impact(payload: ImpactAnalysisRequest) -> ImpactAnalysisRespon
     async with public_repository_checkout(repository_url, depth=depth) as (ref, root, _):
         history = await recent_commit_history(root, limit=payload.lookback_commits)
         commit = _select_commit(history, payload.commit_sha)
+        await checkout_repository_commit(root, commit.sha)
 
         files: dict[str, tuple[str, str | None]] = {}
         candidates: list[tuple[str, str | None, Path]] = []
