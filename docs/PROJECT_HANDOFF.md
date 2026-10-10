@@ -1,7 +1,7 @@
 # ForgeAI — Project Handoff / Source of Truth
 
 > Purpose: exhaustive continuity document for starting a fresh ChatGPT conversation without losing project state.
-> Last updated: 2026-10-06.
+> Last updated: 2026-10-10.
 > Never place secrets, tokens, passwords, or private connection strings in this file.
 
 ## 1. Project identity
@@ -18,6 +18,8 @@ production failure
   -> runtime telemetry
   -> deploy / commit correlation
   -> suspect regression
+  -> changed-symbol / runtime-path localization
+  -> dependency + call graph blast radius
   -> code-level root cause
   -> engineering plan
   -> patch
@@ -125,6 +127,12 @@ Vercel adapter:
 - `VERCEL_TOKEN`
 - `VERCEL_PROJECT_ID`
 - `VERCEL_TEAM_ID` (optional for personal scope)
+
+Planned Sentry adapter:
+- `SENTRY_AUTH_TOKEN`
+- `SENTRY_ORG`
+- `SENTRY_PROJECT`
+- `SENTRY_ENVIRONMENT` (optional)
 
 Web:
 - `NEXT_PUBLIC_API_URL`
@@ -390,29 +398,89 @@ At the time of this handoff:
 - therefore Vercel is implemented but not connected to a real Vercel project/token
 - do not waste time asking user to create a Vercel deploy just for testing unless they want to
 
+### Dependency / call graph + blast-radius analysis
+PR #37
+- endpoint: `POST /api/v1/impact/analyze`
+- Python AST symbols/imports/approximate calls
+- JS/TS regex symbols/imports/approximate calls
+- directed `imports`, `calls`, and `references` edges
+- Git diff hunk -> changed symbol/module mapping
+- runtime/error/stack text -> graph-node mapping
+- bounded upstream callers, downstream dependencies, and affected route/API entrypoints
+- evidence paths, blast-radius score, confidence, and explanations
+- graph evidence feeds incident-correlation scoring
+- responsive web panel for changed symbols, affected entrypoints, and evidence paths
+- API version 0.15.0
+
+PR #38
+- deterministic production smoke for `/api/v1/impact/analyze`
+- incident-correlation smoke updated for `+blast-radius` mode
+
+PR #39
+- separate graph regression benchmark: `GET /api/v1/evaluation/impact-seed`
+- benchmark file: `benchmarks/forgeai-impact.json`
+- original 3-case retrieval seed remains separate for historical comparability
+- 2 pinned ForgeAI self-repo impact cases:
+  1. `analyze_impact` -> entrypoint `analyze`
+  2. `correlate_incident` -> entrypoint `correlate`
+- graph metrics:
+  - changed-symbol accuracy
+  - runtime-symbol accuracy
+  - affected-entrypoint accuracy
+  - average blast-radius score
+
+PR #40
+- prioritizes runtime-relevant changed symbols before response truncation
+- added regression coverage for large changed-symbol sets
+
+PR #41
+- materializes the selected historical Git commit before source scanning
+- prevents old diff line numbers from being mapped against current `main`
+
+PR #42
+- hydrates exact unified-zero diffs per changed source file
+- prevents the bounded combined history patch from hiding later file hunks in large commits
+- final production fix for historical changed-symbol mapping
+
+Final production API commit for this phase:
+`d9731b5aa7c05554eff8fd4c493b220311076551`
+
+
 ## 7. Latest production verification
 
-After PR #34 / #35:
-- API build/tests passed
-- web build passed
-- API deployed live on commit `f4994766e79c4d6de048d14e2f6ba94ff7313cba`
-- web deployed live on same functional multi-provider commit
-- PR #35 only changed smoke workflow
-- live smoke on PR #35 completed successfully
+Blast-radius phase closure, verified 2026-10-10:
+- PR #42 API deploy is live on commit `d9731b5aa7c05554eff8fd4c493b220311076551`
+- final GitHub Actions live-smoke run #28 completed successfully after the production revision was live
+- the same production smoke passed:
+  - API health ✅
+  - database readiness ✅
+  - original 3-case retrieval seed ✅
+  - 2-case impact regression benchmark ✅
+  - Generate Plan ✅
+  - direct blast-radius analysis ✅
+  - incident correlation with graph evidence ✅
+  - telemetry timeline ✅
+  - real Render adapter sync ✅
+  - Vercel adapter status ✅
+  - persistent trace history ✅
+  - live web ✅
+- final real Render adapter sync in that smoke:
+  - 2 deploy events
+  - 100 log events
+  - 102 accepted events
 
-Latest full smoke included:
-- API health ✅
-- database readiness ✅
-- seed benchmark ✅
-- Generate Plan ✅
-- incident correlation ✅
-- telemetry timeline ✅
-- real Render adapter sync ✅
-- Vercel adapter status ✅
-- persistent trace history ✅
-- live web ✅
+Operational lesson:
+- Render commit-triggered deploys have not always started automatically.
+- When needed, use a normal deploy with cache retained and do not mutate environment variables.
+- Live-smoke can race Render's zero-downtime traffic swap; verify the target commit is actually live before treating a smoke failure as an application failure.
 
-## 8. Retrieval benchmark history
+## 8. Benchmark history
+
+### Original retrieval seed
+Exactly 3 ForgeAI self-repo cases:
+1. GitHub URL validation
+2. sandbox patch validation
+3. PR approval gate
 
 Historical post-ranking-v2 clean rerun:
 - Top-1: 66.67%
@@ -421,15 +489,35 @@ Historical post-ranking-v2 clean rerun:
 - symbol hit: 100%
 - avg ranking latency: ~99.67ms
 
-Later measured smoke:
+Earlier later-measured smoke:
 - Top-1: 66.67%
 - Recall@3: 100%
 - MRR: 0.7778
 - symbol accuracy: 100%
 - avg latency: 137ms
 
-Always distinguish historical run vs latest measured run.
-Never fabricate or inflate benchmark numbers.
+Latest production smoke on 2026-10-10:
+- Top-1: 66.67%
+- Recall@3: 100%
+- MRR: 0.8333
+- symbol accuracy: 100%
+- avg ranking latency: 170.0ms
+
+### Impact regression seed
+Separate 2-case pinned ForgeAI self-repo benchmark:
+- pinned regression commit: `3dd89c8b4ebebf24a70aef672f8c13846853eab8`
+- changed-symbol accuracy: **100%**
+- runtime-symbol accuracy: **100%**
+- affected-entrypoint accuracy: **100%**
+- average blast-radius score: **82.0**
+
+Per-case blast-radius scores:
+- `analyze_impact`: 80.0, confidence 0.80
+- `correlate_incident`: 84.0, confidence 0.83
+
+The impact benchmark also emits normal retrieval metrics, but its purpose is graph/regression localization.
+Do not combine the 3 retrieval cases and 2 impact cases into a claim of broad benchmark coverage.
+Both suites are tiny/self-repo; never present them as a general SWE benchmark.
 
 ## 9. Current functional capabilities
 
@@ -472,7 +560,9 @@ Never fabricate or inflate benchmark numbers.
 - trace drilldown endpoint/UI
 
 ### Evaluation
-- seed benchmark API/UI
+- original 3-case retrieval seed benchmark
+- separate 2-case graph regression benchmark
+- graph metrics for changed symbol, runtime symbol, affected entrypoint, and blast-radius score
 - live smoke CI
 
 ### Incident intelligence
@@ -483,6 +573,12 @@ Never fabricate or inflate benchmark numbers.
 - first failure detection
 - nearest preceding deploy
 - production timeline reconstruction
+- Git diff -> changed-symbol mapping
+- runtime / stack evidence -> graph-node mapping
+- bounded upstream/downstream dependency traversal
+- affected route/API entrypoint identification
+- blast-radius score + evidence paths
+- graph evidence feeds incident-correlation confidence
 
 ### Runtime providers
 - generic telemetry ingestion
@@ -502,14 +598,19 @@ Never fabricate or inflate benchmark numbers.
    - public clone path works.
 4. Strong sandbox execution unavailable on Render because no Docker-in-Docker.
 5. Vercel runtime logs are not fully available through the normal Hobby REST integration; use generic telemetry or future Log Drain support.
-6. Call graph / dependency graph / blast-radius analysis is **not implemented yet**.
-7. Sentry adapter is **not implemented yet**.
-8. Railway adapter is **not implemented yet**.
-9. AWS/GCP/Azure/Kubernetes adapters are **not implemented yet**.
-10. Benchmark is tiny and self-repo.
-11. Model token/cost persistence is not implemented.
-12. GitHub PR writer remains non-atomic across multiple file commits.
-13. ForgeAI should not be marketed as "CodeRabbit clone"; product differentiation is production debugging/remediation.
+6. Call/dependency graph analysis is static and approximate:
+   - Python uses AST symbols/imports/calls
+   - JS/TS uses regex/approximate symbols/imports/calls
+   - dynamic dispatch, reflection, generated code, runtime-only bindings, and framework magic can be missed.
+7. Graph construction is per request and bounded; there is not yet a persistent repository-wide graph store.
+8. Impact traversal and response lists are bounded/capped.
+9. Sentry adapter is **not implemented yet**.
+10. Railway adapter is **not implemented yet**.
+11. AWS/GCP/Azure/Kubernetes adapters are **not implemented yet**.
+12. Both benchmark suites are tiny and self-repo.
+13. Model token/cost persistence is not implemented.
+14. GitHub PR writer remains non-atomic across multiple file commits.
+15. ForgeAI should not be marketed as "CodeRabbit clone"; product differentiation is production debugging/remediation.
 
 ## 11. Product positioning
 
@@ -557,7 +658,7 @@ PR #24 established these rules.
 - Do not mutate Render env vars unnecessarily.
 - Do not expose `DATABASE_URL`, Render API key, Vercel token, GitHub token, DB password, or model keys.
 - Do not claim Docker sandbox validation is active on Render.
-- Do not call the tiny 3-case benchmark a general benchmark.
+- Do not call the tiny 3-case retrieval seed or 2-case impact seed a general benchmark.
 - Do not claim Vercel runtime logs are available on Hobby if they are not.
 - Do not make ForgeAI Render-specific.
 - Do not spend time adding provider adapters merely for breadth if the next feature adds more debugging intelligence.
@@ -566,59 +667,52 @@ PR #24 established these rules.
 
 The next highest-value engineering phase is:
 
-# Dependency / call graph + blast-radius analysis
+# Sentry adapter
 
 Goal:
-Move from:
-> "this commit/file is suspicious"
+Move from manually supplied/generic runtime evidence toward automatic exception-centric incident ingestion:
 
-to:
-> "this changed symbol is on the runtime failure path, is called by these endpoints/services, and affects these downstream code paths."
+> Sentry issue/event -> stack trace + release/deploy metadata -> ForgeAI telemetry -> suspect commit -> changed symbol -> blast radius -> remediation path
+
+Keep Sentry-specific logic at the ingestion boundary. After normalization, reuse ForgeAI's shared telemetry, persistence, timeline, incident-correlation, and impact-analysis layers.
 
 Suggested implementation sequence:
+1. Add configuration/status for:
+   - `SENTRY_AUTH_TOKEN`
+   - `SENTRY_ORG`
+   - `SENTRY_PROJECT`
+   - optional `SENTRY_ENVIRONMENT`
+2. Add server-side Sentry REST client with bounded lookback, pagination/rate-limit handling, and no frontend token exposure.
+3. Pull recent error events with full event bodies/stacks where available.
+4. Normalize to ForgeAI telemetry:
+   - source = `sentry`
+   - event_type = `error`
+   - severity
+   - project/service
+   - message/title
+   - stack trace
+   - release / commit SHA when available
+   - issue/event identifiers and URL in metadata
+5. Reuse the shared runtime-provider ingestion/persistence boundary.
+6. Feed normalized events through timeline reconstruction, incident correlation, and blast-radius analysis.
+7. Add:
+   - `GET /api/v1/integrations/sentry/status`
+   - `POST /api/v1/integrations/sentry/sync`
+8. Add responsive Sentry provider UI alongside Render/Vercel.
+9. Add deterministic tests for normalization and release/SHA extraction.
+10. Add live smoke for Sentry status; only require real sync when Sentry is actually configured.
 
-1. Build per-file symbol graph:
-   - Python imports / calls / functions / classes
-   - JS/TS imports / exports / approximate call sites
-2. Store directed edges:
-   - imports
-   - calls
-   - references
-3. Map git diff changed lines -> changed symbols
-4. Map runtime stack-trace symbols/files -> graph nodes
-5. Compute bounded traversal:
-   - upstream callers
-   - downstream dependencies
-   - affected entrypoints/routes
-6. Add blast-radius score + explanation
-7. Feed graph evidence into incident correlation confidence
-8. Add UI:
-   - changed symbol
-   - callers
-   - downstream paths
-   - affected endpoints
-   - evidence path
-9. Add benchmark cases for regression localization with graph evidence
-10. Add live smoke that exercises graph endpoint deterministically on ForgeAI repo
+Honesty requirements:
+- Sentry API scopes/plan capabilities can vary.
+- Symbolication quality depends on data available from Sentry.
+- Release/commit metadata can be absent.
+- ForgeAI must not invent a commit mapping when Sentry does not provide one.
 
-Possible endpoint:
-`POST /api/v1/impact/analyze`
-
-Possible flow:
-```text
-runtime stack
- -> changed symbol
- -> call/dependency graph
- -> affected entrypoints
- -> blast radius
- -> root-cause confidence
-```
-
-After blast-radius analysis, the next likely priorities are:
-- Sentry adapter
+After Sentry, likely priorities:
 - GitHub Actions/Deployments adapter
 - Railway adapter
 - richer incident memory / repeated-regression detection
+- persistent/cached repository graph for larger codebases
 
 ## 16. Fresh-chat bootstrap instruction
 
