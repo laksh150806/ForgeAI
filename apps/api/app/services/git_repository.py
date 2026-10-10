@@ -65,6 +65,31 @@ async def checkout_repository_commit(root: Path, sha: str) -> None:
         )
 
 
+async def commit_patch_for_files(
+    root: Path,
+    sha: str,
+    paths: list[str],
+    per_file_char_limit: int = 40000,
+    max_files: int = 160,
+) -> str:
+    patches: list[str] = []
+    for path in list(dict.fromkeys(paths))[:max_files]:
+        code, stdout, _ = await _run_git(
+            "show",
+            "--format=",
+            "--unified=0",
+            "--no-ext-diff",
+            sha,
+            "--",
+            path,
+            cwd=root,
+            timeout=20,
+        )
+        if code == 0 and stdout:
+            patches.append(stdout[:per_file_char_limit])
+    return "\n".join(patches)
+
+
 async def recent_commit_history(
     root: Path,
     limit: int = 10,
