@@ -282,6 +282,26 @@ type VercelSyncResult = {
   timeline: TelemetryTimeline | null;
 };
 
+type SentryAdapterStatus = {
+  configured: boolean;
+  organization: string | null;
+  project: string | null;
+  environment: string | null;
+  token_configured: boolean;
+  ingestion_mode: string;
+};
+
+type SentrySyncResult = {
+  organization: string;
+  project: string;
+  environment: string | null;
+  error_events: number;
+  accepted_events: number;
+  storage: string;
+  ingestion_mode: string;
+  timeline: TelemetryTimeline | null;
+};
+
 const stages = [
   "Repository connected",
   "Codebase indexed",
@@ -307,6 +327,8 @@ export default function Home() {
   const [renderSync, setRenderSync] = useState<RenderSyncResult | null>(null);
   const [vercelStatus, setVercelStatus] = useState<VercelAdapterStatus | null>(null);
   const [vercelSync, setVercelSync] = useState<VercelSyncResult | null>(null);
+  const [sentryStatus, setSentryStatus] = useState<SentryAdapterStatus | null>(null);
+  const [sentrySync, setSentrySync] = useState<SentrySyncResult | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
@@ -315,7 +337,7 @@ export default function Home() {
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "impact" | "telemetry" | "render" | "vercel" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "impact" | "telemetry" | "render" | "vercel" | "sentry" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -351,6 +373,10 @@ export default function Home() {
     fetch(`${apiUrl}/api/v1/integrations/vercel/status`)
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => payload && setVercelStatus(payload))
+      .catch(() => {});
+    fetch(`${apiUrl}/api/v1/integrations/sentry/status`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => payload && setSentryStatus(payload))
       .catch(() => {});
   }, []);
 
@@ -578,6 +604,33 @@ export default function Home() {
       if (payload.timeline) setTelemetryTimeline(payload.timeline);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Vercel telemetry sync failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function syncSentryTelemetry() {
+    setLoading("sentry");
+    setError("");
+    setSentrySync(null);
+
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/integrations/sentry/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          lookback_minutes: 120,
+          event_limit: 20,
+          reconstruct_timeline: true,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "Sentry telemetry sync failed.");
+      setSentrySync(payload);
+      if (payload.timeline) setTelemetryTimeline(payload.timeline);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "Sentry telemetry sync failed.");
     } finally {
       setLoading(null);
     }
@@ -1079,10 +1132,27 @@ export default function Home() {
             </button>
             {vercelSync && <small>{vercelSync.accepted_events} events → {vercelSync.storage}</small>}
           </article>
+
+          <article>
+            <div className="commandHeader">
+              <strong>Sentry</strong>
+              <span>{sentryStatus?.configured ? "connected" : "not configured"}</span>
+            </div>
+            <p>Exception events + stack traces + release metadata normalized into ForgeAI telemetry.</p>
+            <button
+              className="secondaryButton"
+              disabled={loading !== null || sentryStatus?.configured !== true}
+              type="button"
+              onClick={syncSentryTelemetry}
+            >
+              {loading === "sentry" ? "Syncing Sentry…" : "Sync Sentry"}
+            </button>
+            {sentrySync && <small>{sentrySync.accepted_events} events → {sentrySync.storage}</small>}
+          </article>
         </div>
 
         <p className="adapterStatus">
-          Provider-independent telemetry: Render and Vercel normalize into the same ForgeAI event model.
+          Provider-independent telemetry: Render, Vercel, and Sentry normalize into the same ForgeAI event model.
         </p>
 
         {telemetryTimeline && (
