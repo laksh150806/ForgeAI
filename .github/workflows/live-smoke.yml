@@ -327,6 +327,27 @@ jobs:
           print("Vercel adapter status endpoint: OK")
           PY
 
+
+      - name: Check Sentry adapter status
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            https://forgeai-api-ok42.onrender.com/api/v1/integrations/sentry/status \
+            | tee /tmp/sentry-status.json
+
+          python - <<'PY'
+          import json
+          with open('/tmp/sentry-status.json') as f:
+              data = json.load(f)
+          assert "configured" in data
+          assert "token_configured" in data
+          assert data["ingestion_mode"] == "project-error-events-full"
+          assert "organization" in data
+          assert "project" in data
+          print("Sentry adapter status endpoint: OK")
+          PY
+
       - name: Check live trace history
         shell: bash
         run: |
