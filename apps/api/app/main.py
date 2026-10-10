@@ -9,6 +9,7 @@ from app.routes.incidents import router as incidents_router
 from app.routes.impact import router as impact_router
 from app.routes.integrations import router as integrations_router
 from app.routes.vercel_integration import router as vercel_integration_router
+from app.routes.sentry_integration import router as sentry_integration_router
 from app.routes.evaluation import router as evaluation_router
 from app.routes.planning import router as planning_router
 from app.routes.pull_requests import router as pull_requests_router
@@ -20,7 +21,7 @@ from app.services.trace_store import database_ready
 
 app = FastAPI(
     title="ForgeAI API",
-    version="0.15.0",
+    version="0.16.0",
     description="Autonomous software engineering and incident intelligence platform.",
 )
 
@@ -45,6 +46,7 @@ app.include_router(incidents_router)
 app.include_router(impact_router)
 app.include_router(integrations_router)
 app.include_router(vercel_integration_router)
+app.include_router(sentry_integration_router)
 app.include_router(evaluation_router)
 app.include_router(planning_router)
 app.include_router(pull_requests_router)
@@ -72,6 +74,6 @@ async def ready() -> dict[str, str]:
 def status() -> dict[str, str]:
     return {
         "product": "ForgeAI",
-        "phase": "blast-radius-analysis",
-        "capability": "runtime-to-code correlation with static dependency/call graph impact analysis",
+        "phase": "sentry-runtime-adapter",
+        "capability": "provider-agnostic runtime telemetry with Render, Vercel, and Sentry adapters plus blast-radius analysis",
     }
