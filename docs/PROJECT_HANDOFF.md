@@ -128,7 +128,7 @@ Vercel adapter:
 - `VERCEL_PROJECT_ID`
 - `VERCEL_TEAM_ID` (optional for personal scope)
 
-Planned Sentry adapter:
+Sentry adapter:
 - `SENTRY_AUTH_TOKEN`
 - `SENTRY_ORG`
 - `SENTRY_PROJECT`
@@ -445,11 +445,46 @@ PR #42
 Final production API commit for this phase:
 `d9731b5aa7c05554eff8fd4c493b220311076551`
 
+### Sentry runtime adapter
+PR #44
+- API version 0.16.0
+- endpoints:
+  - `GET /api/v1/integrations/sentry/status`
+  - `POST /api/v1/integrations/sentry/sync`
+- server-side Bearer auth via `SENTRY_AUTH_TOKEN`
+- project-scoped recent error-event polling with bounded pagination and full event bodies
+- normalizes Sentry exception data into the shared ForgeAI `TelemetryEvent` model:
+  - source = `sentry`
+  - error severity/type
+  - project/service
+  - title/message
+  - exception stack frames
+  - issue/event IDs
+  - environment
+  - release metadata
+- conservatively extracts Git-like release hashes into `deploy_sha` when present
+- deterministic event IDs
+- reuses shared provider persistence, Supabase storage, timeline reconstruction, incident correlation, and blast-radius flow
+- responsive Sentry provider card added alongside Render/Vercel
+- runtime provider grid changed to auto-fit instead of a fixed two-column desktop layout
+- deterministic tests cover stack normalization, release/SHA extraction, event IDs, and pagination cursor parsing
+- production smoke verifies the Sentry status endpoint without requiring a configured Sentry account
+
+Current Sentry production state:
+- adapter implementation is deployed live on commit `c85e84361453e8c7067641abd850075191ccdc96`
+- Sentry status endpoint is production verified
+- no real Sentry token/project is configured yet, so real Sentry sync has **not** been production-tested
+- do not ask the user to paste a Sentry token into chat; configure it server-side only if/when they choose to connect Sentry
+
+
 
 ## 7. Latest production verification
 
-Blast-radius phase closure, verified 2026-10-10:
-- PR #42 API deploy is live on commit `d9731b5aa7c05554eff8fd4c493b220311076551`
+Latest production verification, 2026-10-10:
+- Sentry adapter PR #44 API + web are live on commit `c85e84361453e8c7067641abd850075191ccdc96`
+- post-Sentry live-smoke run #29 completed successfully after rerun against the stable deployed revision
+- Sentry adapter status ✅
+- blast-radius phase remains verified from PR #42 commit `d9731b5aa7c05554eff8fd4c493b220311076551`
 - final GitHub Actions live-smoke run #28 completed successfully after the production revision was live
 - the same production smoke passed:
   - API health ✅
@@ -582,8 +617,9 @@ Both suites are tiny/self-repo; never present them as a general SWE benchmark.
 
 ### Runtime providers
 - generic telemetry ingestion
-- Render automatic adapter (production verified)
+- Render automatic adapter (real sync production verified)
 - Vercel adapter (implemented, status production verified, not connected to real project yet)
+- Sentry adapter (implemented and status production verified; real sync not yet configured/tested)
 
 ## 10. Current limitations / do not misrepresent
 
@@ -604,13 +640,14 @@ Both suites are tiny/self-repo; never present them as a general SWE benchmark.
    - dynamic dispatch, reflection, generated code, runtime-only bindings, and framework magic can be missed.
 7. Graph construction is per request and bounded; there is not yet a persistent repository-wide graph store.
 8. Impact traversal and response lists are bounded/capped.
-9. Sentry adapter is **not implemented yet**.
-10. Railway adapter is **not implemented yet**.
-11. AWS/GCP/Azure/Kubernetes adapters are **not implemented yet**.
-12. Both benchmark suites are tiny and self-repo.
-13. Model token/cost persistence is not implemented.
-14. GitHub PR writer remains non-atomic across multiple file commits.
-15. ForgeAI should not be marketed as "CodeRabbit clone"; product differentiation is production debugging/remediation.
+9. Sentry adapter is implemented, but no real Sentry project/token is configured yet; only the status surface is production verified.
+10. Sentry release/commit mapping is intentionally conservative and remains unknown when release metadata does not contain a Git-like hash.
+11. Railway adapter is **not implemented yet**.
+12. AWS/GCP/Azure/Kubernetes adapters are **not implemented yet**.
+13. Both benchmark suites are tiny and self-repo.
+14. Model token/cost persistence is not implemented.
+15. GitHub PR writer remains non-atomic across multiple file commits.
+16. ForgeAI should not be marketed as "CodeRabbit clone"; product differentiation is production debugging/remediation.
 
 ## 11. Product positioning
 
@@ -660,6 +697,7 @@ PR #24 established these rules.
 - Do not claim Docker sandbox validation is active on Render.
 - Do not call the tiny 3-case retrieval seed or 2-case impact seed a general benchmark.
 - Do not claim Vercel runtime logs are available on Hobby if they are not.
+- Do not claim real Sentry sync is production verified until a Sentry project/token is actually configured and synced.
 - Do not make ForgeAI Render-specific.
 - Do not spend time adding provider adapters merely for breadth if the next feature adds more debugging intelligence.
 
@@ -667,49 +705,39 @@ PR #24 established these rules.
 
 The next highest-value engineering phase is:
 
-# Sentry adapter
+# GitHub Actions / Deployments adapter
 
 Goal:
-Move from manually supplied/generic runtime evidence toward automatic exception-centric incident ingestion:
+Add CI/CD context to incident correlation so ForgeAI can distinguish a source-code regression from a failed build, workflow change, or deployment transition:
 
-> Sentry issue/event -> stack trace + release/deploy metadata -> ForgeAI telemetry -> suspect commit -> changed symbol -> blast radius -> remediation path
+> runtime failure -> deployment/release -> GitHub deployment/workflow run -> commit -> changed symbol -> blast radius -> remediation path
 
-Keep Sentry-specific logic at the ingestion boundary. After normalization, reuse ForgeAI's shared telemetry, persistence, timeline, incident-correlation, and impact-analysis layers.
+Keep GitHub-specific polling at the ingestion boundary and normalize useful events into the existing ForgeAI telemetry/runtime-provider model.
 
 Suggested implementation sequence:
-1. Add configuration/status for:
-   - `SENTRY_AUTH_TOKEN`
-   - `SENTRY_ORG`
-   - `SENTRY_PROJECT`
-   - optional `SENTRY_ENVIRONMENT`
-2. Add server-side Sentry REST client with bounded lookback, pagination/rate-limit handling, and no frontend token exposure.
-3. Pull recent error events with full event bodies/stacks where available.
-4. Normalize to ForgeAI telemetry:
-   - source = `sentry`
-   - event_type = `error`
-   - severity
-   - project/service
-   - message/title
-   - stack trace
-   - release / commit SHA when available
-   - issue/event identifiers and URL in metadata
-5. Reuse the shared runtime-provider ingestion/persistence boundary.
-6. Feed normalized events through timeline reconstruction, incident correlation, and blast-radius analysis.
-7. Add:
-   - `GET /api/v1/integrations/sentry/status`
-   - `POST /api/v1/integrations/sentry/sync`
-8. Add responsive Sentry provider UI alongside Render/Vercel.
-9. Add deterministic tests for normalization and release/SHA extraction.
-10. Add live smoke for Sentry status; only require real sync when Sentry is actually configured.
+1. Reuse server-side `GITHUB_TOKEN` when configured; keep public-repo reads available where GitHub permits.
+2. Add GitHub Actions/Deployments status surface.
+3. Poll bounded recent:
+   - deployments + deployment statuses
+   - workflow runs for the repository/default branch
+   - failed job/step summaries where practical
+4. Normalize into ForgeAI telemetry:
+   - source = `github`
+   - event types such as `deploy`, `ci_failure`, `workflow`
+   - commit/deploy SHA
+   - workflow/deployment identifiers
+   - status/conclusion
+   - relevant URLs/metadata
+5. Feed normalized deployment/CI evidence through timeline reconstruction and incident correlation.
+6. Add:
+   - `GET /api/v1/integrations/github-runtime/status`
+   - `POST /api/v1/integrations/github-runtime/sync`
+7. Add responsive provider UI.
+8. Add deterministic normalization tests.
+9. Add live status smoke; only make authenticated/private-repo behavior conditional on configuration.
+10. Keep scope bounded so this improves debugging intelligence rather than becoming generic CI monitoring.
 
-Honesty requirements:
-- Sentry API scopes/plan capabilities can vary.
-- Symbolication quality depends on data available from Sentry.
-- Release/commit metadata can be absent.
-- ForgeAI must not invent a commit mapping when Sentry does not provide one.
-
-After Sentry, likely priorities:
-- GitHub Actions/Deployments adapter
+After GitHub Actions/Deployments, likely priorities:
 - Railway adapter
 - richer incident memory / repeated-regression detection
 - persistent/cached repository graph for larger codebases
