@@ -1,7 +1,7 @@
 # ForgeAI — Project Handoff / Source of Truth
 
 > Purpose: exhaustive continuity document for starting a fresh ChatGPT conversation without losing project state.
-> Last updated: 2026-10-10.
+> Last updated: 2026-10-28.
 > Never place secrets, tokens, passwords, or private connection strings in this file.
 
 ## 1. Project identity
@@ -478,9 +478,27 @@ Current Sentry production state:
 
 
 
+### GitHub Actions / Deployments runtime adapter
+PR #46 merged on 2026-10-28, API version 0.17.0.
+- `GET /api/v1/integrations/github-runtime/status` and `POST /api/v1/integrations/github-runtime/sync`.
+- Bounded recent GitHub deployments/statuses, default-branch workflow runs, and failed job/step summaries. No raw logs, workflow triggering, or deploy creation.
+- Public repositories work without a token subject to GitHub rate limits; private read access needs suitable server-side `GITHUB_TOKEN` permissions.
+- Normalizes `source=github`, deployment, CI-failure, and workflow events to the existing shared telemetry, persistence, timeline, incident-correlation, and blast-radius flow.
+- CI failures carrying a Git SHA are not treated as completed deploys; only explicitly successful deployment statuses represent a successful deployment.
+- Stable event IDs scope repository, service, and provider object IDs to avoid cross-service upsert collisions.
+- Responsive GitHub CI/CD card; deterministic tests for normalization, bounded polling, error handling, idempotence, and service isolation.
+- API tests and Next.js build both passed on PR #46.
+- API and web deployed merged commit `a784f24a92582de7a3f029256304889ae5cc7fb2` on 2026-10-28.
+- Live smoke includes a read-only status check and a bounded public-repository `dry_run` sync that exercises GitHub polling and normalization without persisting or reconstructing a timeline. Private/authenticated behavior and real persistent GitHub sync have not been production verified.
+
 ## 7. Latest production verification
 
-Latest production verification, 2026-10-10:
+Latest production verification, 2026-10-28:
+- GitHub Actions / Deployments adapter PR #46 merged as `a784f24a92582de7a3f029256304889ae5cc7fb2` and both Render API and web reached `live`.
+- PR #46 CI: API tests and Next.js build passed.
+- The first post-merge live-smoke attempt raced Render's zero-downtime rollout (readiness HTTP 503, impact benchmark HTTP 502 shortly before the new API became live). The rerun passed impact/correlation but failed at generic telemetry ingestion (HTTP 500) because the existing Supabase pooler rejected the tenant/user. This is a separate database infrastructure blocker; no environment values were changed.
+- First smoke's original three-case retrieval seed measured Top-1 33.33%, Recall@3 100%, MRR 0.6111, symbol accuracy 100%. This tiny self-repo benchmark has a ranking regression worth investigating separately.
+- Historical Sentry closure from 2026-10-10 follows:
 - Sentry adapter PR #44 API + web are live on commit `c85e84361453e8c7067641abd850075191ccdc96`
 - post-Sentry live-smoke run #29 completed successfully after rerun against the stable deployed revision
 - Sentry adapter status ✅
@@ -620,6 +638,7 @@ Both suites are tiny/self-repo; never present them as a general SWE benchmark.
 - Render automatic adapter (real sync production verified)
 - Vercel adapter (implemented, status production verified, not connected to real project yet)
 - Sentry adapter (implemented and status production verified; real sync not yet configured/tested)
+- GitHub Actions/Deployments adapter (implemented; API/web live; dry-run live smoke available; persistent sync blocked by database connectivity)
 
 ## 10. Current limitations / do not misrepresent
 
@@ -703,45 +722,23 @@ PR #24 established these rules.
 
 ## 15. Recommended next phase
 
-The next highest-value engineering phase is:
+**First operational priority:** Supabase project is confirmed `INACTIVE` in the connected Supabase project status on 2026-10-28. Reactivate it using the secure Supabase dashboard/authorized workflow, if appropriate for the plan, before retesting `/ready` and durable telemetry. Do not change connection strings or paste secrets into chat. Once healthy, verify actual GitHub adapter persistence and timeline correlation with a uniquely scoped service.
 
-# GitHub Actions / Deployments adapter
 
-Goal:
-Add CI/CD context to incident correlation so ForgeAI can distinguish a source-code regression from a failed build, workflow change, or deployment transition:
+The GitHub Actions / Deployments integration was implemented in PR #46. The next highest-value phase should improve production debugging depth, not merely add another adapter:
 
-> runtime failure -> deployment/release -> GitHub deployment/workflow run -> commit -> changed symbol -> blast radius -> remediation path
+# Incident memory and repeated-regression detection
 
-Keep GitHub-specific polling at the ingestion boundary and normalize useful events into the existing ForgeAI telemetry/runtime-provider model.
+Goal: connect similar production failures across releases without mistaking recurring symptoms for the same root cause.
 
-Suggested implementation sequence:
-1. Reuse server-side `GITHUB_TOKEN` when configured; keep public-repo reads available where GitHub permits.
-2. Add GitHub Actions/Deployments status surface.
-3. Poll bounded recent:
-   - deployments + deployment statuses
-   - workflow runs for the repository/default branch
-   - failed job/step summaries where practical
-4. Normalize into ForgeAI telemetry:
-   - source = `github`
-   - event types such as `deploy`, `ci_failure`, `workflow`
-   - commit/deploy SHA
-   - workflow/deployment identifiers
-   - status/conclusion
-   - relevant URLs/metadata
-5. Feed normalized deployment/CI evidence through timeline reconstruction and incident correlation.
-6. Add:
-   - `GET /api/v1/integrations/github-runtime/status`
-   - `POST /api/v1/integrations/github-runtime/sync`
-7. Add responsive provider UI.
-8. Add deterministic normalization tests.
-9. Add live status smoke; only make authenticated/private-repo behavior conditional on configuration.
-10. Keep scope bounded so this improves debugging intelligence rather than becoming generic CI monitoring.
+Suggested sequence:
+1. Define a bounded, provider-agnostic incident fingerprint based on normalized error type, stable stack symbols/files, and service scope.
+2. Persist fingerprints and correlation summaries in the existing durable storage with safe retention and no secrets.
+3. Retrieve prior relevant incidents and deploy/commit evidence; show explicit confidence and conflicting evidence.
+4. Add a repeated-regression flag in incident/timeline UI, with human-verifiable links to historical events and commits.
+5. Build deterministic tests for near-duplicate, unrelated, and cross-service cases; add a small smoke that does not create noisy production incidents.
 
-After GitHub Actions/Deployments, likely priorities:
-- Railway adapter
-- richer incident memory / repeated-regression detection
-- persistent/cached repository graph for larger codebases
-
+Possible later priorities: persistent/cached repository graph, Railway adapter, better retrieval ranking.
 ## 16. Fresh-chat bootstrap instruction
 
 At the beginning of a new chat, tell ChatGPT:

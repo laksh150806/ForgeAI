@@ -13,6 +13,7 @@ class GitHubRuntimeSyncRequest(BaseModel):
     workflow_limit: int = Field(default=15, ge=1, le=30)
     failed_job_limit: int = Field(default=3, ge=0, le=5)
     reconstruct_timeline: bool = True
+    dry_run: bool = False
 
 
 class GitHubRuntimeStatus(BaseModel):

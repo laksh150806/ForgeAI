@@ -47,6 +47,10 @@ def test_normalize_success_and_failure_deployments_and_stable_ids():
     assert first[1].severity == "error"
     assert first[1].deploy_sha is None
     assert [e.event_id for e in first] == [e.event_id for e in second]
+    other_service = adapter.normalize_github_deployments(
+        deployments, statuses, repository="org/repo", service="another-api", since=SINCE,
+    )
+    assert first[0].event_id != other_service[0].event_id
 
 
 def test_pending_deployment_is_not_a_completed_deploy():
@@ -76,6 +80,10 @@ def test_failed_workflow_job_step_summary_and_ci_not_a_deploy():
     assert first.metadata["github_failed_jobs"][0]["failed_steps"] == ["pytest"]
     assert "Tests (failure): pytest" in first.message
     assert first.event_id == second.event_id
+    changed_service = adapter.normalize_github_runs(
+        runs, jobs, repository="org/repo", service="other-api", since=SINCE,
+    )[0]
+    assert first.event_id != changed_service.event_id
     timeline_event = TelemetryTimelineEvent.model_validate(first.model_dump())
     assert _is_failure(timeline_event)
     assert nearest_preceding_deploy([timeline_event], timeline_event.observed_at) is None
@@ -134,6 +142,38 @@ def test_bounded_sync_uses_public_api_shared_pipeline_and_no_logs(monkeypatch):
     assert dict(requests[1][1])["per_page"] == "1"
     assert dict(requests[2][1])["branch"] == "main"
     assert all("/logs" not in p for p, _, _ in requests)
+
+
+def test_dry_run_polls_normalizes_but_never_persists(monkeypatch):
+    now = datetime.now(timezone.utc).isoformat()
+    def handler(request):
+        path = request.url.path
+        if path == "/repos/org/repo":
+            payload = {"default_branch": "main"}
+        elif path == "/repos/org/repo/deployments":
+            payload = []
+        elif path == "/repos/org/repo/actions/runs":
+            payload = {"workflow_runs": [{
+                "id": 15, "name": "CI", "conclusion": "success",
+                "status": "completed", "updated_at": now, "head_sha": SHA,
+            }]}
+        else:
+            raise AssertionError(path)
+        return httpx.Response(200, json=payload)
+    original = httpx.AsyncClient
+    monkeypatch.setattr(adapter.httpx, "AsyncClient",
+                        lambda **kwargs: original(transport=httpx.MockTransport(handler), **kwargs))
+    async def forbidden_persist(**kwargs):
+        raise AssertionError("dry-run must never enter shared persistent pipeline")
+    monkeypatch.setattr(adapter, "persist_provider_events", forbidden_persist)
+    data = asyncio.run(adapter.sync_github_runtime(GitHubRuntimeSyncRequest(
+        repository_url="https://github.com/org/repo", dry_run=True,
+        deployment_limit=1, workflow_limit=1, failed_job_limit=0,
+    )))
+    assert data.workflow_events == 1
+    assert data.accepted_events == 0
+    assert data.storage == "dry-run"
+    assert data.timeline is None
 
 
 def test_api_errors_are_sanitized_and_sync_url_is_validated(monkeypatch):

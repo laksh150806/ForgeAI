@@ -30,9 +30,22 @@ jobs:
           echo "API health never reached 200"
           exit 1
 
-      - name: Check readiness
+      - name: Wait for database readiness after Render swap
+        shell: bash
         run: |
-          curl --fail --show-error --silent             https://forgeai-api-ok42.onrender.com/ready             | tee /tmp/ready.json
+          set -euo pipefail
+          url="https://forgeai-api-ok42.onrender.com/ready"
+          for attempt in $(seq 1 24); do
+            code=$(curl -sS -o /tmp/ready.json -w "%{http_code}" "$url" || true)
+            if [ "$code" = "200" ]; then
+              cat /tmp/ready.json
+              exit 0
+            fi
+            echo "Attempt $attempt: readiness returned $code"
+            sleep 10
+          done
+          cat /tmp/ready.json || true
+          exit 1
 
       - name: Run live seed benchmark
         shell: bash
@@ -363,6 +376,29 @@ jobs:
           assert data["public_repository_reads"] is True
           assert data["ingestion_mode"] == "deployments+actions-summary"
           print("GitHub runtime read-only status: OK")
+          PY
+
+      - name: Bounded public GitHub runtime sync (no credentials or workflow trigger)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            -X POST -H "Content-Type: application/json" \
+            -d '{"repository_url":"https://github.com/laksh150806/ForgeAI","service":"forgeai-github-live-smoke","lookback_minutes":10080,"deployment_limit":1,"workflow_limit":2,"failed_job_limit":0,"reconstruct_timeline":false,"dry_run":true}' \
+            https://forgeai-api-ok42.onrender.com/api/v1/integrations/github-runtime/sync \
+            | tee /tmp/github-runtime-sync.json
+          python - <<'PY'
+          import json
+          with open("/tmp/github-runtime-sync.json") as f:
+              data = json.load(f)
+          assert data["repository"] == "laksh150806/ForgeAI"
+          assert data["branch"] == "main"
+          assert data["service"] == "forgeai-github-live-smoke"
+          assert data["workflow_events"] >= 1
+          assert data["accepted_events"] == 0
+          assert data["storage"] == "dry-run"
+          assert data["timeline"] is None
+          print("Bounded public GitHub runtime sync: OK")
           PY
 
       - name: Check live trace history

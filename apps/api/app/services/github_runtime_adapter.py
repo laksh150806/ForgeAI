@@ -16,7 +16,7 @@ from app.schemas.github_runtime_adapter import (
 )
 from app.schemas.telemetry import TelemetryEvent
 from app.services.github_client import parse_github_repository_url
-from app.services.runtime_provider import persist_provider_events
+from app.services.runtime_provider import RuntimeProviderSyncResult, persist_provider_events
 
 
 GITHUB_API = "https://api.github.com"
@@ -102,7 +102,7 @@ def normalize_github_deployments(
         sha = _sha(deployment.get("sha"))
         events.append(
             TelemetryEvent(
-                event_id=_event_id(repository, "deployment", deployment_id, status_id),
+                event_id=_event_id(repository, service, "deployment", deployment_id, status_id),
                 observed_at=observed_at,
                 source="github",
                 event_type=event_type,
@@ -187,7 +187,7 @@ def normalize_github_runs(
         attempt = run.get("run_attempt") if isinstance(run.get("run_attempt"), int) else 1
         events.append(
             TelemetryEvent(
-                event_id=_event_id(repository, "run", run_id, attempt),
+                event_id=_event_id(repository, service, "run", run_id, attempt),
                 observed_at=observed_at,
                 source="github",
                 event_type="ci_failure" if failed else "workflow",
@@ -313,14 +313,21 @@ async def sync_github_runtime(payload: GitHubRuntimeSyncRequest) -> GitHubRuntim
         runs[:payload.workflow_limit], failed_jobs,
         repository=repository, service=service, since=since,
     )
-    result = await persist_provider_events(
-        events=deploy_events + workflow_events,
-        repository_url=str(payload.repository_url),
-        service=service,
-        lookback_minutes=payload.lookback_minutes,
-        max_events=payload.deployment_limit + payload.workflow_limit,
-        reconstruct=payload.reconstruct_timeline,
-    )
+    if payload.dry_run:
+        # Read-only live verification: exercise real provider polling and normalization
+        # without touching the telemetry store, database, or correlation pipeline.
+        result = RuntimeProviderSyncResult(
+            accepted_events=0, storage="dry-run", timeline=None,
+        )
+    else:
+        result = await persist_provider_events(
+            events=deploy_events + workflow_events,
+            repository_url=str(payload.repository_url),
+            service=service,
+            lookback_minutes=payload.lookback_minutes,
+            max_events=payload.deployment_limit + payload.workflow_limit,
+            reconstruct=payload.reconstruct_timeline,
+        )
     return GitHubRuntimeSyncResponse(
         repository=repository,
         branch=branch,
