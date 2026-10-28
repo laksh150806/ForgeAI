@@ -496,6 +496,7 @@ PR #46 merged on 2026-10-28, API version 0.17.0.
 Latest production verification, 2026-10-28:
 - GitHub Actions / Deployments adapter PR #46 merged as `a784f24a92582de7a3f029256304889ae5cc7fb2` and both Render API and web reached `live`.
 - PR #46 CI: API tests and Next.js build passed.
+- PR #47 merged as `0144921cca3e27c314e16637bee86dcfad82b8a9`; the independent GitHub runtime smoke rerun (run `40730700347`, attempt 2) passed against the live API using bounded public GitHub polling, normalization, and `dry_run=true` with zero DB writes. A follow-up workflow gate ensures older Render revisions are not asked to process the new dry-run request.
 - The first post-merge live-smoke attempt raced Render's zero-downtime rollout (readiness HTTP 503, impact benchmark HTTP 502 shortly before the new API became live). The rerun passed impact/correlation but failed at generic telemetry ingestion (HTTP 500) because the existing Supabase pooler rejected the tenant/user. This is a separate database infrastructure blocker; no environment values were changed.
 - First smoke's original three-case retrieval seed measured Top-1 33.33%, Recall@3 100%, MRR 0.6111, symbol accuracy 100%. This tiny self-repo benchmark has a ranking regression worth investigating separately.
 - Historical Sentry closure from 2026-10-10 follows:
