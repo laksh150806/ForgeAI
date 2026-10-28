@@ -489,14 +489,14 @@ PR #46 merged on 2026-10-28, API version 0.17.0.
 - Responsive GitHub CI/CD card; deterministic tests for normalization, bounded polling, error handling, idempotence, and service isolation.
 - API tests and Next.js build both passed on PR #46.
 - API and web deployed merged commit `a784f24a92582de7a3f029256304889ae5cc7fb2` on 2026-10-28.
-- Live smoke includes a read-only status check and a very small public-repository sync (persistence only; timeline reconstruction disabled). Private/authenticated behavior has not been production verified.
+- Live smoke includes a read-only status check and a bounded public-repository `dry_run` sync that exercises GitHub polling and normalization without persisting or reconstructing a timeline. Private/authenticated behavior and real persistent GitHub sync have not been production verified.
 
 ## 7. Latest production verification
 
 Latest production verification, 2026-10-28:
 - GitHub Actions / Deployments adapter PR #46 merged as `a784f24a92582de7a3f029256304889ae5cc7fb2` and both Render API and web reached `live`.
 - PR #46 CI: API tests and Next.js build passed.
-- The first post-merge live-smoke attempt raced Render's zero-downtime rollout (readiness HTTP 503, impact benchmark HTTP 502 shortly before the new API became live). A rerun was launched against the stable revision.
+- The first post-merge live-smoke attempt raced Render's zero-downtime rollout (readiness HTTP 503, impact benchmark HTTP 502 shortly before the new API became live). The rerun passed impact/correlation but failed at generic telemetry ingestion (HTTP 500) because the existing Supabase pooler rejected the tenant/user. This is a separate database infrastructure blocker; no environment values were changed.
 - First smoke's original three-case retrieval seed measured Top-1 33.33%, Recall@3 100%, MRR 0.6111, symbol accuracy 100%. This tiny self-repo benchmark has a ranking regression worth investigating separately.
 - Historical Sentry closure from 2026-10-10 follows:
 - Sentry adapter PR #44 API + web are live on commit `c85e84361453e8c7067641abd850075191ccdc96`
@@ -638,7 +638,7 @@ Both suites are tiny/self-repo; never present them as a general SWE benchmark.
 - Render automatic adapter (real sync production verified)
 - Vercel adapter (implemented, status production verified, not connected to real project yet)
 - Sentry adapter (implemented and status production verified; real sync not yet configured/tested)
-- GitHub Actions/Deployments adapter (implemented; deployed API/web; live status and bounded public-repo sync smoke included)
+- GitHub Actions/Deployments adapter (implemented; API/web live; dry-run live smoke available; persistent sync blocked by database connectivity)
 
 ## 10. Current limitations / do not misrepresent
 
@@ -721,6 +721,9 @@ PR #24 established these rules.
 - Do not spend time adding provider adapters merely for breadth if the next feature adds more debugging intelligence.
 
 ## 15. Recommended next phase
+
+**First operational priority:** restore Supabase connection so `/ready` and persistent telemetry can pass again. Use secure dashboards only for connection diagnosis; do not paste secrets in chat. When healthy, verify actual GitHub adapter persistence and timeline correlation with a uniquely scoped service.
+
 
 The GitHub Actions / Deployments integration was implemented in PR #46. The next highest-value phase should improve production debugging depth, not merely add another adapter:
 
