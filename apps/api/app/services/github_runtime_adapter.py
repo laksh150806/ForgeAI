@@ -16,7 +16,7 @@ from app.schemas.github_runtime_adapter import (
 )
 from app.schemas.telemetry import TelemetryEvent
 from app.services.github_client import parse_github_repository_url
-from app.services.runtime_provider import persist_provider_events
+from app.services.runtime_provider import RuntimeProviderSyncResult, persist_provider_events
 
 
 GITHUB_API = "https://api.github.com"
@@ -313,14 +313,21 @@ async def sync_github_runtime(payload: GitHubRuntimeSyncRequest) -> GitHubRuntim
         runs[:payload.workflow_limit], failed_jobs,
         repository=repository, service=service, since=since,
     )
-    result = await persist_provider_events(
-        events=deploy_events + workflow_events,
-        repository_url=str(payload.repository_url),
-        service=service,
-        lookback_minutes=payload.lookback_minutes,
-        max_events=payload.deployment_limit + payload.workflow_limit,
-        reconstruct=payload.reconstruct_timeline,
-    )
+    if payload.dry_run:
+        # Read-only live verification: exercise real provider polling and normalization
+        # without touching the telemetry store, database, or correlation pipeline.
+        result = RuntimeProviderSyncResult(
+            accepted_events=0, storage="dry-run", timeline=None,
+        )
+    else:
+        result = await persist_provider_events(
+            events=deploy_events + workflow_events,
+            repository_url=str(payload.repository_url),
+            service=service,
+            lookback_minutes=payload.lookback_minutes,
+            max_events=payload.deployment_limit + payload.workflow_limit,
+            reconstruct=payload.reconstruct_timeline,
+        )
     return GitHubRuntimeSyncResponse(
         repository=repository,
         branch=branch,
