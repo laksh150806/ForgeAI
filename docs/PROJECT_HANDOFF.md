@@ -722,7 +722,7 @@ PR #24 established these rules.
 
 ## 15. Recommended next phase
 
-**First operational priority:** restore Supabase connection so `/ready` and persistent telemetry can pass again. Use secure dashboards only for connection diagnosis; do not paste secrets in chat. When healthy, verify actual GitHub adapter persistence and timeline correlation with a uniquely scoped service.
+**First operational priority:** Supabase project is confirmed `INACTIVE` in the connected Supabase project status on 2026-10-28. Reactivate it using the secure Supabase dashboard/authorized workflow, if appropriate for the plan, before retesting `/ready` and durable telemetry. Do not change connection strings or paste secrets into chat. Once healthy, verify actual GitHub adapter persistence and timeline correlation with a uniquely scoped service.
 
 
 The GitHub Actions / Deployments integration was implemented in PR #46. The next highest-value phase should improve production debugging depth, not merely add another adapter:
