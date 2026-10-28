@@ -102,7 +102,7 @@ def normalize_github_deployments(
         sha = _sha(deployment.get("sha"))
         events.append(
             TelemetryEvent(
-                event_id=_event_id(repository, "deployment", deployment_id, status_id),
+                event_id=_event_id(repository, service, "deployment", deployment_id, status_id),
                 observed_at=observed_at,
                 source="github",
                 event_type=event_type,
@@ -187,7 +187,7 @@ def normalize_github_runs(
         attempt = run.get("run_attempt") if isinstance(run.get("run_attempt"), int) else 1
         events.append(
             TelemetryEvent(
-                event_id=_event_id(repository, "run", run_id, attempt),
+                event_id=_event_id(repository, service, "run", run_id, attempt),
                 observed_at=observed_at,
                 source="github",
                 event_type="ci_failure" if failed else "workflow",

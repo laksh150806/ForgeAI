@@ -47,6 +47,10 @@ def test_normalize_success_and_failure_deployments_and_stable_ids():
     assert first[1].severity == "error"
     assert first[1].deploy_sha is None
     assert [e.event_id for e in first] == [e.event_id for e in second]
+    other_service = adapter.normalize_github_deployments(
+        deployments, statuses, repository="org/repo", service="another-api", since=SINCE,
+    )
+    assert first[0].event_id != other_service[0].event_id
 
 
 def test_pending_deployment_is_not_a_completed_deploy():
@@ -76,6 +80,10 @@ def test_failed_workflow_job_step_summary_and_ci_not_a_deploy():
     assert first.metadata["github_failed_jobs"][0]["failed_steps"] == ["pytest"]
     assert "Tests (failure): pytest" in first.message
     assert first.event_id == second.event_id
+    changed_service = adapter.normalize_github_runs(
+        runs, jobs, repository="org/repo", service="other-api", since=SINCE,
+    )[0]
+    assert first.event_id != changed_service.event_id
     timeline_event = TelemetryTimelineEvent.model_validate(first.model_dump())
     assert _is_failure(timeline_event)
     assert nearest_preceding_deploy([timeline_event], timeline_event.observed_at) is None
