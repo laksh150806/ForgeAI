@@ -348,6 +348,23 @@ jobs:
           print("Sentry adapter status endpoint: OK")
           PY
 
+      - name: Check GitHub Actions / Deployments adapter status (read-only)
+        shell: bash
+        run: |
+          set -euo pipefail
+          curl --fail --show-error --silent \
+            https://forgeai-api-ok42.onrender.com/api/v1/integrations/github-runtime/status \
+            | tee /tmp/github-runtime-status.json
+          python - <<'PY'
+          import json
+          with open("/tmp/github-runtime-status.json") as f:
+              data = json.load(f)
+          assert isinstance(data["token_configured"], bool)
+          assert data["public_repository_reads"] is True
+          assert data["ingestion_mode"] == "deployments+actions-summary"
+          print("GitHub runtime read-only status: OK")
+          PY
+
       - name: Check live trace history
         shell: bash
         run: |

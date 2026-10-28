@@ -302,6 +302,25 @@ type SentrySyncResult = {
   timeline: TelemetryTimeline | null;
 };
 
+type GitHubRuntimeStatus = {
+  token_configured: boolean;
+  public_repository_reads: boolean;
+  ingestion_mode: string;
+};
+
+type GitHubRuntimeSyncResult = {
+  repository: string;
+  branch: string;
+  service: string;
+  deployment_events: number;
+  workflow_events: number;
+  ci_failure_events: number;
+  failed_jobs_summarized: number;
+  accepted_events: number;
+  storage: string;
+  timeline: TelemetryTimeline | null;
+};
+
 const stages = [
   "Repository connected",
   "Codebase indexed",
@@ -329,6 +348,8 @@ export default function Home() {
   const [vercelSync, setVercelSync] = useState<VercelSyncResult | null>(null);
   const [sentryStatus, setSentryStatus] = useState<SentryAdapterStatus | null>(null);
   const [sentrySync, setSentrySync] = useState<SentrySyncResult | null>(null);
+  const [githubRuntimeStatus, setGithubRuntimeStatus] = useState<GitHubRuntimeStatus | null>(null);
+  const [githubRuntimeSync, setGithubRuntimeSync] = useState<GitHubRuntimeSyncResult | null>(null);
   const [plan, setPlan] = useState<Plan | null>(null);
   const [validation, setValidation] = useState<Validation | null>(null);
   const [workflowRun, setWorkflowRun] = useState<WorkflowRun | null>(null);
@@ -337,7 +358,7 @@ export default function Home() {
   const [recentRuns, setRecentRuns] = useState<RecentRun[]>([]);
   const [prApproved, setPrApproved] = useState(false);
   const [error, setError] = useState("");
-  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "impact" | "telemetry" | "render" | "vercel" | "sentry" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
+  const [loading, setLoading] = useState<"repo" | "code" | "investigate" | "incident" | "impact" | "telemetry" | "render" | "vercel" | "sentry" | "github-runtime" | "plan" | "validate" | "workflow" | "pr" | "benchmark" | null>(null);
 
   const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:8000";
 
@@ -377,6 +398,10 @@ export default function Home() {
     fetch(`${apiUrl}/api/v1/integrations/sentry/status`)
       .then((response) => response.ok ? response.json() : null)
       .then((payload) => payload && setSentryStatus(payload))
+      .catch(() => {});
+    fetch(`${apiUrl}/api/v1/integrations/github-runtime/status`)
+      .then((response) => response.ok ? response.json() : null)
+      .then((payload) => payload && setGithubRuntimeStatus(payload))
       .catch(() => {});
   }, []);
 
@@ -631,6 +656,35 @@ export default function Home() {
       if (payload.timeline) setTelemetryTimeline(payload.timeline);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "Sentry telemetry sync failed.");
+    } finally {
+      setLoading(null);
+    }
+  }
+
+  async function syncGithubRuntimeTelemetry() {
+    setLoading("github-runtime");
+    setError("");
+    setGithubRuntimeSync(null);
+    try {
+      const response = await fetch(`${apiUrl}/api/v1/integrations/github-runtime/sync`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          repository_url: repositoryUrl,
+          service: telemetryService.trim() || undefined,
+          lookback_minutes: 1440,
+          deployment_limit: 10,
+          workflow_limit: 15,
+          failed_job_limit: 3,
+          reconstruct_timeline: true,
+        }),
+      });
+      const payload = await response.json();
+      if (!response.ok) throw new Error(payload.detail ?? "GitHub runtime sync failed.");
+      setGithubRuntimeSync(payload);
+      if (payload.timeline) setTelemetryTimeline(payload.timeline);
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : "GitHub runtime sync failed.");
     } finally {
       setLoading(null);
     }
@@ -1149,10 +1203,32 @@ export default function Home() {
             </button>
             {sentrySync && <small>{sentrySync.accepted_events} events → {sentrySync.storage}</small>}
           </article>
+
+          <article>
+            <div className="commandHeader">
+              <strong>GitHub CI/CD</strong>
+              <span>{githubRuntimeStatus ? (githubRuntimeStatus.token_configured ? "token configured" : "public repositories") : "status unavailable"}</span>
+            </div>
+            <p>Recent deployment status, default-branch Actions runs, and bounded failed-job summaries. Public repos work without a token.</p>
+            <button
+              className="secondaryButton"
+              disabled={loading !== null || !githubRuntimeStatus?.public_repository_reads}
+              type="button"
+              onClick={syncGithubRuntimeTelemetry}
+            >
+              {loading === "github-runtime" ? "Syncing GitHub…" : "Sync GitHub CI/CD"}
+            </button>
+            {githubRuntimeSync && (
+              <small>
+                {githubRuntimeSync.deployment_events} deployments · {githubRuntimeSync.workflow_events} workflows
+                · {githubRuntimeSync.ci_failure_events} failed runs · {githubRuntimeSync.accepted_events} events → {githubRuntimeSync.storage}
+              </small>
+            )}
+          </article>
         </div>
 
         <p className="adapterStatus">
-          Provider-independent telemetry: Render, Vercel, and Sentry normalize into the same ForgeAI event model.
+          Provider-independent telemetry: Render, Vercel, Sentry, and GitHub CI/CD normalize into the same ForgeAI event model.
         </p>
 
         {telemetryTimeline && (
