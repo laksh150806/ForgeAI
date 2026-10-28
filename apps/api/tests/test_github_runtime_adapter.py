@@ -144,6 +144,38 @@ def test_bounded_sync_uses_public_api_shared_pipeline_and_no_logs(monkeypatch):
     assert all("/logs" not in p for p, _, _ in requests)
 
 
+def test_dry_run_polls_normalizes_but_never_persists(monkeypatch):
+    now = datetime.now(timezone.utc).isoformat()
+    def handler(request):
+        path = request.url.path
+        if path == "/repos/org/repo":
+            payload = {"default_branch": "main"}
+        elif path == "/repos/org/repo/deployments":
+            payload = []
+        elif path == "/repos/org/repo/actions/runs":
+            payload = {"workflow_runs": [{
+                "id": 15, "name": "CI", "conclusion": "success",
+                "status": "completed", "updated_at": now, "head_sha": SHA,
+            }]}
+        else:
+            raise AssertionError(path)
+        return httpx.Response(200, json=payload)
+    original = httpx.AsyncClient
+    monkeypatch.setattr(adapter.httpx, "AsyncClient",
+                        lambda **kwargs: original(transport=httpx.MockTransport(handler), **kwargs))
+    async def forbidden_persist(**kwargs):
+        raise AssertionError("dry-run must never enter shared persistent pipeline")
+    monkeypatch.setattr(adapter, "persist_provider_events", forbidden_persist)
+    data = asyncio.run(adapter.sync_github_runtime(GitHubRuntimeSyncRequest(
+        repository_url="https://github.com/org/repo", dry_run=True,
+        deployment_limit=1, workflow_limit=1, failed_job_limit=0,
+    )))
+    assert data.workflow_events == 1
+    assert data.accepted_events == 0
+    assert data.storage == "dry-run"
+    assert data.timeline is None
+
+
 def test_api_errors_are_sanitized_and_sync_url_is_validated(monkeypatch):
     def handler(request):
         return httpx.Response(403, json={"message": "secret downstream text"})
