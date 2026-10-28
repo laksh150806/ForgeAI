@@ -47,6 +47,15 @@ def test_nearest_preceding_deploy_prefers_closest_prior_release():
     assert deploy.deploy_sha == "new2222"
 
 
+def test_ci_failure_with_sha_is_failure_not_deploy():
+    from app.services.telemetry_timeline import _is_failure
+
+    ci_event = _event(minutes=1, event_type="ci_failure", severity="error", deploy_sha="abc123456")
+    failure_at = ci_event.observed_at
+    assert _is_failure(ci_event)
+    assert nearest_preceding_deploy([ci_event], failure_at) is None
+
+
 def test_no_preceding_deploy_returns_none():
     events = [
         _event(minutes=2, event_type="error", severity="error"),

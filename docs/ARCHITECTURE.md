@@ -150,11 +150,20 @@ is responsible only for authentication, provider API calls, and normalization in
 reconstruction, and runtime-to-code correlation.
 
 ```text
-Render API ─┐
-            ├─> TelemetryEvent[] ─> shared provider pipeline ─> Supabase
-Vercel API ─┘                                              └─> timeline/correlation
+Render API ──────┐
+Vercel API ──────┤
+Sentry API ──────┼─> TelemetryEvent[] ─> shared provider pipeline ─> Supabase
+GitHub REST API ─┘                                           └─> timeline/correlation
 Generic POST ────────────────────────────────────────────────────────────────┘
 ```
+
+The GitHub Actions/Deployments boundary reads only recent deployment status and default-branch
+workflow-run summaries. It fetches bounded failed job/step names, never raw job logs, and
+does not trigger a workflow, rerun, or deployment. A GitHub deployment status of
+success is treated as a deploy; failed CI and queued deployments are not. Correlation
+may use commit SHAs from workflows but must not confuse those SHAs with deployment evidence.
+Public repositories can be read without a token within GitHub API limits, while private
+repositories require appropriate read-only token permissions.
 
 This prevents provider-specific behavior from leaking into root-cause reasoning and makes new
 adapters incremental rather than architectural rewrites.

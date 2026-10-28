@@ -12,7 +12,7 @@ from app.services.incident_correlation import correlate_incident
 from app.services.telemetry_store import recent_events
 
 
-_FAILURE_TYPES = {"error", "exception", "failure", "crash", "alert"}
+_FAILURE_TYPES = {"error", "exception", "failure", "crash", "alert", "ci_failure"}
 _FAILURE_SEVERITIES = {"error", "critical", "fatal"}
 _DEPLOY_TYPES = {"deploy", "deployment", "release"}
 
@@ -25,7 +25,8 @@ def _is_failure(event: TelemetryTimelineEvent) -> bool:
 
 
 def _is_deploy(event: TelemetryTimelineEvent) -> bool:
-    return event.event_type.lower() in _DEPLOY_TYPES or bool(event.deploy_sha)
+    # CI failures and ordinary logs may carry a commit SHA, but are not deployments.
+    return event.event_type.lower() in _DEPLOY_TYPES
 
 
 def nearest_preceding_deploy(
