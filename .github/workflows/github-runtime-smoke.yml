@@ -22,10 +22,22 @@ jobs:
             code=$(curl -sS -o /tmp/github-runtime-status.json -w "%{http_code}" \
               "$url/api/v1/integrations/github-runtime/status" || true)
             if [ "$code" = "200" ]; then
-              ready=1
-              break
+              # A previous Render revision may have status but not yet support dry_run.
+              # Never POST until the deployed request schema confirms read-only mode.
+              schema_code=$(curl -sS -o /tmp/github-runtime-openapi.json -w "%{http_code}" "$url/openapi.json" || true)
+              if [ "$schema_code" = "200" ] && python - <<'PY'
+          import json
+          with open("/tmp/github-runtime-openapi.json") as f:
+              spec = json.load(f)
+          schema = spec.get("components", {}).get("schemas", {}).get("GitHubRuntimeSyncRequest", {})
+          assert "dry_run" in schema.get("properties", {})
+          PY
+              then
+                ready=1
+                break
+              fi
             fi
-            echo "Attempt $attempt: GitHub runtime adapter status HTTP $code"
+            echo "Attempt $attempt: waiting for deployed GitHub dry-run schema (status HTTP $code)"
             sleep 10
           done
           if [ "$ready" != "1" ]; then
